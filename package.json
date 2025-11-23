@@ -1,0 +1,39 @@
+{
+  "name": "mahspeccy-websocket-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "WebSocket bridge service for mahSpeccy - maintains persistent cTrader connections",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test-connection.js",
+    "deploy": "node deploy-railway.js",
+    "monitor": "node monitor-health.js",
+    "autoscale": "node auto-scale.js",
+    "logs": "node fetch-logs.js",
+    "logs:follow": "node fetch-logs.js --follow",
+    "logs:errors": "node fetch-logs.js --errors",
+    "health-check": "node -e \"import('./monitor-health.js').then(m => m.performSingleCheck())\"",
+    "setup": "npm install && cp .env.example .env && echo '✅ Setup complete! Edit .env with your credentials.'"
+  },
+  "keywords": [
+    "ctrader",
+    "websocket",
+    "trading",
+    "forex"
+  ],
+  "author": "mahSpeccy",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "ws": "^8.16.0",
+    "protobufjs": "^7.2.5",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

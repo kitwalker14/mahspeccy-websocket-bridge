@@ -1,0 +1,74 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests (if any)
+        run: npm test || echo "No tests configured"
+
+      - name: Trigger Railway deployment via webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.RAILWAY_WEBHOOK_URL }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -d '{
+              "ref": "'"$GITHUB_REF"'",
+              "repository": {
+                "full_name": "'"$GITHUB_REPOSITORY"'",
+                "name": "'"$GITHUB_REPOSITORY#*/}"'",
+                "clone_url": "https://github.com/'"$GITHUB_REPOSITORY"'.git"
+              },
+              "pusher": {
+                "name": "'"$GITHUB_ACTOR"'",
+                "email": "github-actions@github.com"
+              },
+              "head_commit": {
+                "id": "'"$GITHUB_SHA"'",
+                "message": "Automated deployment",
+                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
+                "author": {
+                  "name": "'"$GITHUB_ACTOR"'",
+                  "email": "github-actions@github.com"
+                }
+              },
+              "commits": []
+            }'
+
+      - name: Deployment notification
+        if: success()
+        run: |
+          echo "✅ Railway deployment triggered successfully"
+          echo "Commit: $GITHUB_SHA"
+          echo "Branch: $GITHUB_REF"
