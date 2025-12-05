@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window", "deno.ns", "dom"],
+    "strict": true,
+    "allowJs": false
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --watch main.ts",
+    "start": "deno run --allow-net --allow-env main.ts",
+    "test": "deno test --allow-net --allow-env"
+  },
+  "imports": {
+    "hono": "https://deno.land/x/hono@v4.0.0/mod.ts",
+    "hono/cors": "https://deno.land/x/hono@v4.0.0/middleware/cors/index.ts",
+    "hono/logger": "https://deno.land/x/hono@v4.0.0/middleware/logger/index.ts"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": true
+  }
+}
