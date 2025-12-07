@@ -89,6 +89,7 @@ message ProtoOASymbolsListReq {
 
     required int64 ctidTraderAccountId = 2;
     optional bool includeArchivedSymbols = 3 [default = false];
+    optional string accessToken = 4; // Some brokers require this field
 }
 
 /** Response to the ProtoOASymbolsListReq request. */
