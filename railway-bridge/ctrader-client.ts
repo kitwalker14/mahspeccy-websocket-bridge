@@ -316,7 +316,7 @@ export class CTraderClient {
   /**
    * Get symbols list
    */
-  async getSymbols(accountId: string): Promise<any> {
+  async getSymbols(accountId: string, accessToken?: string): Promise<any> {
     if (!this.accountAuthenticated) {
       throw new Error('Account not authenticated');
     }
@@ -325,6 +325,7 @@ export class CTraderClient {
     
     const request: SymbolsListReq = {
       ctidTraderAccountId: parseInt(accountId),
+      ...(accessToken && { accessToken }), // Include accessToken if provided
     };
     
     const response = await this.sendRequest(
