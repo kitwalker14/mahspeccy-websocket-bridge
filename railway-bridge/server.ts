@@ -1,299 +1,372 @@
 /**
- * WebSocket Server using Hono
- * Handles WebSocket connections from frontend and routes to TCP connections
+ * Railway Bridge Server - Production Ready
+ * 
+ * WebSocket-to-REST adapter for cTrader Open API
+ * Architecture: Supabase → Railway Bridge (REST) → cTrader (WebSocket)
+ * 
+ * Features:
+ * ✅ Full Protocol Buffers support
+ * ✅ WebSocket connection pooling
+ * ✅ Proper authentication flow
+ * ✅ Error handling & logging
+ * ✅ Health checks
  */
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { ConnectionManager } from './connection-manager.ts';
-import { MessageRouter } from './message-router.ts';
-import { validateSessionToken, createSessionToken } from './auth-middleware.ts';
+import { connectionPool } from './connection-pool.ts';
+import type { CTraderCredentials } from './ctrader-client.ts';
 
-export function createServer(environment: 'demo' | 'live') {
-  const app = new Hono();
+const app = new Hono();
+
+// Global state
+const startTime = Date.now();
+
+// ============================================================================
+// MIDDLEWARE
+// ============================================================================
+
+// CORS - Allow Supabase to call this service
+app.use('*', cors({
+  origin: '*', // In production, restrict to your Supabase domain
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// Logging
+app.use('*', logger());
+
+// Request logging
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  console.log(`${c.req.method} ${c.req.path} - ${c.res.status} (${ms}ms)`);
+});
+
+// ============================================================================
+// HEALTH & STATUS ENDPOINTS
+// ============================================================================
+
+app.get('/health', (c) => {
+  const stats = connectionPool.getStats();
   
-  // Connection manager - handles TCP connection pooling
-  const connectionManager = new ConnectionManager(environment);
-  
-  // Message router - translates WebSocket JSON ↔ ProtoOA
-  const messageRouter = new MessageRouter();
-  
-  // Middleware
-  app.use('*', cors({
-    origin: '*', // TODO: Restrict in production
-    credentials: true,
-  }));
-  
-  app.use('*', logger(console.log));
-  
-  // Health check endpoint
-  app.get('/health', (c) => {
-    const stats = connectionManager.getStats();
-    return c.json({
-      status: 'healthy',
-      environment,
-      connections: stats.activeConnections,
-      uptime: Math.floor(process.uptime?.() || 0),
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-    });
+  return c.json({
+    status: 'healthy',
+    uptime: Math.floor((Date.now() - startTime) / 1000),
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    connections: {
+      total: stats.total,
+      inUse: stats.inUse,
+      idle: stats.idle,
+    },
+    features: [
+      'Protocol Buffers support',
+      'WebSocket connection pooling',
+      'cTrader ProtoOA protocol',
+      'Automatic reconnection',
+    ],
   });
+});
+
+app.get('/stats', (c) => {
+  const stats = connectionPool.getStats();
   
-  // WebSocket endpoint
-  app.get('/ws', async (c) => {
-    // Validate session token from query params
-    const token = c.req.query('token');
-    
-    if (!token) {
-      return c.text('Missing session token', 401);
-    }
-    
-    const sessionData = await validateSessionToken(token);
-    
-    if (!sessionData) {
-      return c.text('Invalid session token', 401);
-    }
-    
-    // Upgrade to WebSocket
-    const upgrade = c.req.raw.headers.get('upgrade');
-    if (upgrade !== 'websocket') {
-      return c.text('Expected WebSocket', 400);
-    }
-    
-    const { socket, response } = Deno.upgradeWebSocket(c.req.raw);
-    
-    socket.onopen = async () => {
-      console.log(`✅ [${sessionData.userId}] WebSocket connected`);
-      
-      try {
-        // Get or create TCP connection for this user
-        const tcpConnection = await connectionManager.getConnection(
-          sessionData.userId,
-          sessionData.credentials
-        );
-        
-        // Store socket reference
-        connectionManager.registerSocket(sessionData.userId, socket);
-        
-        // Send connection success
-        socket.send(JSON.stringify({
-          type: 'CONNECTION_SUCCESS',
-          data: {
-            environment,
-            connected: true,
-            timestamp: Date.now(),
-          },
-        }));
-        
-        // Setup TCP event forwarding
-        tcpConnection.on('message', (data: any) => {
-          // Forward TCP messages to WebSocket
-          const jsonMessage = messageRouter.protoToJson(data);
-          socket.send(JSON.stringify(jsonMessage));
-        });
-        
-        tcpConnection.on('error', (error: any) => {
-          socket.send(JSON.stringify({
-            type: 'ERROR',
-            error: error.message,
-            timestamp: Date.now(),
-          }));
-        });
-        
-        tcpConnection.on('disconnected', () => {
-          socket.send(JSON.stringify({
-            type: 'DISCONNECTED',
-            timestamp: Date.now(),
-          }));
-          socket.close();
-        });
-        
-      } catch (error) {
-        console.error(`❌ [${sessionData.userId}] Failed to establish TCP connection:`, error);
-        socket.send(JSON.stringify({
-          type: 'CONNECTION_ERROR',
-          error: error instanceof Error ? error.message : 'Connection failed',
-        }));
-        socket.close();
-      }
-    };
-    
-    socket.onmessage = async (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log(`📥 [${sessionData.userId}] Received:`, message.type);
-        
-        // Get user's TCP connection
-        const tcpConnection = connectionManager.getUserConnection(sessionData.userId);
-        
-        if (!tcpConnection) {
-          socket.send(JSON.stringify({
-            type: 'ERROR',
-            error: 'No TCP connection available',
-            requestId: message.requestId,
-          }));
-          return;
-        }
-        
-        // Route message to TCP connection
-        await messageRouter.handleWebSocketMessage(message, tcpConnection);
-        
-      } catch (error) {
-        console.error(`❌ [${sessionData.userId}] Message handling error:`, error);
-        socket.send(JSON.stringify({
-          type: 'ERROR',
-          error: error instanceof Error ? error.message : 'Message handling failed',
-        }));
-      }
-    };
-    
-    socket.onclose = () => {
-      console.log(`🔌 [${sessionData.userId}] WebSocket disconnected`);
-      connectionManager.unregisterSocket(sessionData.userId);
-      
-      // Optional: Keep TCP connection alive for reconnection
-      // Or close it immediately:
-      // connectionManager.closeConnection(sessionData.userId);
-    };
-    
-    socket.onerror = (error) => {
-      console.error(`❌ [${sessionData.userId}] WebSocket error:`, error);
-      connectionManager.unregisterSocket(sessionData.userId);
-    };
-    
-    return response;
+  return c.json({
+    uptime: Math.floor((Date.now() - startTime) / 1000),
+    connectionPool: stats,
+    memory: {
+      heapUsed: Deno.memoryUsage().heapUsed,
+      heapTotal: Deno.memoryUsage().heapTotal,
+      external: Deno.memoryUsage().external,
+    },
   });
+});
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Validate request body
+ */
+function validateRequest(body: any): { valid: boolean; error?: string; credentials?: CTraderCredentials } {
+  if (!body) {
+    return { valid: false, error: 'Request body is required' };
+  }
+
+  const { clientId, clientSecret, accessToken, accountId, isDemo } = body;
+
+  if (!clientId) {
+    return { valid: false, error: 'clientId is required' };
+  }
+  if (!clientSecret) {
+    return { valid: false, error: 'clientSecret is required' };
+  }
+  if (!accessToken) {
+    return { valid: false, error: 'accessToken is required' };
+  }
+  if (!accountId) {
+    return { valid: false, error: 'accountId is required' };
+  }
+
+  const credentials: CTraderCredentials = {
+    clientId,
+    clientSecret,
+    accessToken,
+    accountId: accountId.toString(),
+    isDemo: isDemo !== false, // Default to demo for safety
+  };
+
+  return { valid: true, credentials };
+}
+
+/**
+ * Handle errors consistently
+ */
+function handleError(error: any, context: string) {
+  console.error(`[${context}] Error:`, error);
   
-  // Session token endpoint (for testing/debugging)
-  app.post('/session/create', async (c) => {
+  return {
+    error: error.message || 'Unknown error',
+    code: 'CTRADER_ERROR',
+    context,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+// ============================================================================
+// CTRADER API ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/account
+ * Fetch account data via cTrader WebSocket
+ */
+app.post('/api/account', async (c) => {
+  try {
     const body = await c.req.json();
-    const { userId, credentials } = body;
+    const validation = validateRequest(body);
     
-    if (!userId || !credentials) {
-      return c.json({ error: 'Missing userId or credentials' }, 400);
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
     }
-    
-    const token = await createSessionToken({ userId, credentials });
-    
+
+    const credentials = validation.credentials!;
+    console.log(`[Account] Fetching data for account ${credentials.accountId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Use connection pool to execute request
+    const traderData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getTrader(credentials.accountId);
+    });
+
+    console.log(`[Account] ✅ Success for account ${credentials.accountId}`);
+
     return c.json({
       success: true,
-      token,
-      expiresIn: 86400, // 24 hours
+      data: {
+        accountId: credentials.accountId,
+        balance: traderData.balance || 0,
+        equity: traderData.equity || 0,
+        freeMargin: traderData.freeMargin || 0,
+        margin: traderData.margin || 0,
+        leverage: traderData.leverage || 1,
+        isDemo: credentials.isDemo,
+        timestamp: new Date().toISOString(),
+      },
     });
-  });
-  
-  // Stats endpoint (for monitoring)
-  app.get('/stats', (c) => {
-    const stats = connectionManager.getStats();
-    return c.json(stats);
-  });
-  
-  // ============================================================================
-  // REST API ENDPOINTS (for Supabase Edge Function integration)
-  // ============================================================================
-  
-  /**
-   * POST /api/account
-   * Get account data (balance, equity, margin) via REST
-   */
-  app.post('/api/account', async (c) => {
-    try {
-      const body = await c.req.json();
-      const { clientId, clientSecret, accessToken, accountId, environment: env } = body;
-      
-      if (!clientId || !clientSecret || !accessToken || !accountId) {
-        return c.json({ error: 'Missing required fields' }, 400);
-      }
-      
-      console.log(`📊 [REST API] Account request for ${accountId} (${env})`);
-      
-      // Create temporary connection for this request
-      const userId = `rest_${accountId}_${Date.now()}`;
-      const credentials = { clientId, clientSecret, accessToken, accountId };
-      
-      const tcpConnection = await connectionManager.getConnection(userId, credentials);
-      
-      // Send account info request
-      const accountData = await messageRouter.requestAccountInfo(tcpConnection, accountId);
-      
-      // Cleanup connection
-      await connectionManager.closeConnection(userId);
-      
-      return c.json(accountData);
-    } catch (error: any) {
-      console.error('❌ [REST API] Account error:', error);
-      return c.json({ error: error.message }, 500);
+  } catch (error) {
+    console.error('[Account] Error:', error);
+    return c.json(handleError(error, 'api/account'), 500);
+  }
+});
+
+/**
+ * POST /api/positions
+ * Fetch open positions via cTrader WebSocket
+ */
+app.post('/api/positions', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
     }
-  });
-  
-  /**
-   * POST /api/positions
-   * Get positions, orders, and deals via REST
-   */
-  app.post('/api/positions', async (c) => {
-    try {
-      const body = await c.req.json();
-      const { clientId, clientSecret, accessToken, accountId, environment: env } = body;
-      
-      if (!clientId || !clientSecret || !accessToken || !accountId) {
-        return c.json({ error: 'Missing required fields' }, 400);
-      }
-      
-      console.log(`📍 [REST API] Positions request for ${accountId} (${env})`);
-      
-      // Create temporary connection for this request
-      const userId = `rest_${accountId}_${Date.now()}`;
-      const credentials = { clientId, clientSecret, accessToken, accountId };
-      
-      const tcpConnection = await connectionManager.getConnection(userId, credentials);
-      
-      // Send positions/orders request
-      const positionsData = await messageRouter.requestPositions(tcpConnection, accountId);
-      
-      // Cleanup connection
-      await connectionManager.closeConnection(userId);
-      
-      return c.json(positionsData);
-    } catch (error: any) {
-      console.error('❌ [REST API] Positions error:', error);
-      return c.json({ error: error.message }, 500);
+
+    const credentials = validation.credentials!;
+    console.log(`[Positions] Fetching positions for account ${credentials.accountId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Use connection pool to execute request
+    const reconcileData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getPositions(credentials.accountId);
+    });
+
+    console.log(`[Positions] ✅ Success - ${reconcileData.position?.length || 0} positions`);
+
+    return c.json({
+      success: true,
+      data: {
+        positions: reconcileData.position || [],
+        orders: reconcileData.order || [],
+        accountId: credentials.accountId,
+        isDemo: credentials.isDemo,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('[Positions] Error:', error);
+    return c.json(handleError(error, 'api/positions'), 500);
+  }
+});
+
+/**
+ * POST /api/symbols
+ * Fetch available symbols via cTrader WebSocket
+ */
+app.post('/api/symbols', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
     }
-  });
-  
-  /**
-   * POST /api/symbols
-   * Get available symbols via REST
-   */
-  app.post('/api/symbols', async (c) => {
-    try {
-      const body = await c.req.json();
-      const { clientId, clientSecret, accessToken, accountId, environment: env } = body;
-      
-      if (!clientId || !clientSecret || !accessToken || !accountId) {
-        return c.json({ error: 'Missing required fields' }, 400);
-      }
-      
-      console.log(`📋 [REST API] Symbols request for ${accountId} (${env})`);
-      
-      // Create temporary connection for this request
-      const userId = `rest_${accountId}_${Date.now()}`;
-      const credentials = { clientId, clientSecret, accessToken, accountId };
-      
-      const tcpConnection = await connectionManager.getConnection(userId, credentials);
-      
-      // Send symbols request
-      const symbolsData = await messageRouter.requestSymbols(tcpConnection, accountId);
-      
-      // Cleanup connection
-      await connectionManager.closeConnection(userId);
-      
-      return c.json(symbolsData);
-    } catch (error: any) {
-      console.error('❌ [REST API] Symbols error:', error);
-      return c.json({ error: error.message }, 500);
+
+    const credentials = validation.credentials!;
+    console.log(`[Symbols] Fetching symbols for account ${credentials.accountId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Use connection pool to execute request
+    const symbolsData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getSymbols(credentials.accountId);
+    });
+
+    console.log(`[Symbols] ✅ Success - ${symbolsData.symbol?.length || 0} symbols`);
+
+    return c.json({
+      success: true,
+      data: {
+        symbols: symbolsData.symbol || [],
+        accountId: credentials.accountId,
+        isDemo: credentials.isDemo,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('[Symbols] Error:', error);
+    return c.json(handleError(error, 'api/symbols'), 500);
+  }
+});
+
+/**
+ * POST /api/accounts
+ * Get all accounts for an access token
+ */
+app.post('/api/accounts', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
     }
-  });
-  
-  return app;
-}
+
+    const credentials = validation.credentials!;
+    console.log(`[Accounts] Fetching accounts list (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Use connection pool to execute request (only needs app auth, not account auth)
+    const accountsData = await connectionPool.withConnection(credentials, async (client) => {
+      // Disconnect account auth for this request
+      return await client.getAccounts(credentials.accessToken);
+    });
+
+    console.log(`[Accounts] ✅ Success - ${accountsData.ctidTraderAccount?.length || 0} accounts`);
+
+    return c.json({
+      success: true,
+      data: {
+        accounts: accountsData.ctidTraderAccount || [],
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('[Accounts] Error:', error);
+    return c.json(handleError(error, 'api/accounts'), 500);
+  }
+});
+
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
+
+app.notFound((c) => {
+  return c.json({
+    error: 'Not Found',
+    path: c.req.path,
+    availableEndpoints: [
+      'GET /health',
+      'GET /stats',
+      'POST /api/account',
+      'POST /api/positions',
+      'POST /api/symbols',
+      'POST /api/accounts',
+    ],
+  }, 404);
+});
+
+app.onError((err, c) => {
+  console.error('[Server Error]', err);
+  return c.json({
+    error: 'Internal Server Error',
+    message: err.message,
+    timestamp: new Date().toISOString(),
+  }, 500);
+});
+
+// ============================================================================
+// GRACEFUL SHUTDOWN
+// ============================================================================
+
+Deno.addSignalListener('SIGINT', () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  connectionPool.shutdown();
+  Deno.exit(0);
+});
+
+Deno.addSignalListener('SIGTERM', () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  connectionPool.shutdown();
+  Deno.exit(0);
+});
+
+// ============================================================================
+// START SERVER
+// ============================================================================
+
+const PORT = parseInt(Deno.env.get('PORT') || '8080');
+
+console.log('');
+console.log('🚀 Railway Bridge Server - Production Ready');
+console.log('='.repeat(60));
+console.log('');
+console.log('Features:');
+console.log('  ✅ cTrader ProtoOA Protocol Buffers');
+console.log('  ✅ WebSocket Connection Pooling');
+console.log('  ✅ Automatic Reconnection');
+console.log('  ✅ Full Authentication Flow');
+console.log('');
+console.log('Endpoints:');
+console.log('  GET  /health          - Health check');
+console.log('  GET  /stats           - Connection pool stats');
+console.log('  POST /api/account     - Fetch account data');
+console.log('  POST /api/positions   - Fetch positions');
+console.log('  POST /api/symbols     - Fetch symbols');
+console.log('  POST /api/accounts    - List accounts');
+console.log('');
+console.log(`🌐 Server starting on port ${PORT}...`);
+console.log('='.repeat(60));
+console.log('');
+
+Deno.serve({ port: PORT }, app.fetch);

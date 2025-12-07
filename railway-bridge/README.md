@@ -1,296 +1,261 @@
-# Railway Bridge Infrastructure
+# Railway Bridge - cTrader WebSocket-to-REST Adapter
 
-## Overview
-
-The **Railway Bridge** is a critical infrastructure component that extends mahSpeccy's capabilities beyond Supabase Edge Functions' TCP timeout limitations. It enables long-running operations (TCP WebSocket connections, persistent streaming, high-throughput processing) by deploying a complementary Node.js/Deno service on Railway.app that works alongside your Supabase backend.
+**Production-ready WebSocket bridge for cTrader Open API**
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    mahSpeccy Frontend                        │
-│                   (React + TypeScript)                       │
-└────────────┬────────────────────────────────┬───────────────┘
-             │                                │
-             │ Standard API calls             │ Long-running ops
-             │ (< 10s timeout)                │ (WebSocket, streaming)
-             ▼                                ▼
-┌────────────────────────────┐    ┌──────────────────────────┐
-│   Supabase Edge Functions  │    │    Railway Bridge        │
-│      (Deno Runtime)        │    │   (Node.js/Deno)         │
-│                            │    │                          │
-│  • Auth & User Mgmt        │    │  • WebSocket (cTrader)   │
-│  • KV Store CRUD           │    │  • Long TCP connections  │
-│  • Quick API calls         │    │  • Persistent sessions   │
-│  • Data validation         │    │  • High-throughput ops   │
-└────────────────────────────┘    └──────────────────────────┘
-             │                                │
-             │                                │
-             ▼                                ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    External Services                         │
-│                                                              │
-│  • cTrader Open API (ProtoOA via WebSocket)                │
-│  • FXCM ForexConnect API (Market Data, Trading)            │
-│  • Other long-running integrations                          │
-└─────────────────────────────────────────────────────────────┘
+Supabase Backend → Railway Bridge (REST) → cTrader (WebSocket + ProtoOA)
 ```
 
-## Key Components
+## Features
 
-### 1. Railway SDK Ingestion (`/supabase/functions/railway-ingest/`)
+✅ **Full cTrader ProtoOA Protocol** - Complete Protocol Buffers implementation  
+✅ **WebSocket Connection Pooling** - Reuse connections for performance  
+✅ **Automatic Authentication** - Handles app + account auth flow  
+✅ **Error Handling** - Comprehensive error handling and logging  
+✅ **Health Checks** - Monitor connection pool status  
+✅ **Graceful Shutdown** - Clean disconnection on server stop  
 
-**Purpose:** Fetches the complete Railway SDK repository structure and content from GitHub API for deep integration analysis.
+## Quick Start
 
-**Files:**
-- `index.tsx` - Edge Function that fetches Railway SDK from GitHub
-- `kv_store.tsx` - KV utilities for storing manifest data
+### Local Development
 
-**Features:**
-- ✅ Fetches entire repository tree recursively
-- ✅ Downloads file contents for analysis (TypeScript, JavaScript, GraphQL, etc.)
-- ✅ Stores manifest in KV store for frontend access
-- ✅ Search functionality for finding specific files/patterns
-- ✅ Statistics and file tree visualization
+```bash
+# Install Deno (if not installed)
+curl -fsSL https://deno.land/install.sh | sh
 
-**Usage:**
-```typescript
-import { ingestRailwaySDK, getManifest, searchManifest } from '../railway-bridge/railway-ingest-client';
+# Run server
+deno task start
 
-// Trigger ingestion
-const result = await ingestRailwaySDK();
-
-// Get full manifest
-const manifest = await getManifest();
-
-// Search for files
-const results = await searchManifest('graphql');
+# Or with watch mode
+deno task dev
 ```
 
-**UI Component:**
-- Navigate to **Settings** tab → **Railway SDK Ingest** section
-- Click "Ingest SDK" to download complete Railway SDK
-- Browse files, search, and view statistics
+Server will start on `http://localhost:8080`
 
-### 2. Railway SDK Client (`/railway-bridge/railway-ingest-client.ts`)
+### Deploy to Railway
 
-**Purpose:** Frontend utility for interacting with Railway SDK ingestion.
+1. **Push code to GitHub**
+   ```bash
+   git add .
+   git commit -m "Railway Bridge with ProtoOA protocol"
+   git push origin main
+   ```
 
-**Functions:**
-- `ingestRailwaySDK()` - Trigger ingestion from GitHub
-- `getIngestionStatus()` - Check if SDK has been ingested
-- `getManifest()` - Retrieve full manifest with file contents
-- `searchManifest(query)` - Search files by path or name
-- `findFileInManifest(manifest, path)` - Find specific file
-- `getFilesByExtension(manifest, ext)` - Filter by extension
-- `getDirectoryTree(manifest)` - Get tree visualization
-- `getManifestStats(manifest)` - Get file counts and sizes
+2. **Connect Railway to GitHub**
+   - Go to https://railway.app
+   - Click "New Project"
+   - Select "Deploy from GitHub repo"
+   - Choose your repository
 
-### 3. GraphQL Mutation Documentation
+3. **Configure Railway**
+   - Railway will auto-detect Deno project
+   - Set start command: `deno task start`
+   - Set PORT environment variable (Railway provides this automatically)
 
-**Captured Mutations:**
+4. **Deploy**
+   - Railway will deploy automatically
+   - Get your deployment URL: `https://your-project.up.railway.app`
 
-#### Deployment Operations
-- `deploymentCancel` - Cancel a deployment
-- `deploymentRedeploy` - Redeploy from a previous deployment
-- `deploymentRemove` - Delete a deployment
-- `deploymentRestart` - Restart a deployment
-- `deploymentRollback` - Rollback to previous deployment
-- `deploymentStop` - Stop a deployment
-- `deploymentTriggerCreate` - Create deployment trigger
-- `deploymentTriggerDelete` - Delete deployment trigger
-- `deploymentTriggerUpdate` - Update deployment trigger
+5. **Update Supabase**
+   - Go to Supabase Dashboard → Edge Functions
+   - Add environment variable: `RAILWAY_BRIDGE_URL=https://your-project.up.railway.app`
+   - Redeploy Supabase functions
 
-#### Docker Compose Operations
-- `dockerComposeImportEnvOverrides` - Import environment overrides
-- `dockerComposeProjectCreate` - Create project from docker-compose
-- `dockerComposeServiceCreate` - Create service from docker-compose
-- `dockerComposeServiceUpdate` - Update docker-compose service
+## API Endpoints
 
-#### Egress Gateway Operations
-- `egressGatewayServiceAssociate` - Associate egress gateway with service
-- `egressGatewayServiceDisassociate` - Disassociate egress gateway
+### Health Check
+```bash
+GET /health
 
-#### Email Operations
-- `emailChange` - Change user email
-
-#### Environment Operations
-- `environmentCreate` - Create new environment
-- `environmentDelete` - Delete environment
-- `environmentPatchCommit` - Commit environment patch
-- `environmentRename` - Rename environment
-- `environmentTriggersDeploy` - Deploy all connected triggers
-
-#### Feature Flags
-- `fairUseAgree` - Agree to fair use policy
-- `featureFlagAdd` - Add feature flag for user
-- `featureFlagRemove` - Remove feature flag
-
-#### GitHub Operations
-- `githubRepoDeploy` - Deploy GitHub repository
-
-#### Heroku Operations
-- `herokuImportVariables` - Import variables from Heroku
-
-#### Integration Operations
-- `integrationCreate` - Create integration for project
-- `integrationDelete` - Delete integration
-
-## Deployment Process
-
-### Prerequisites
-1. ✅ GitHub account with repository exported
-2. ✅ Railway.app account created
-3. ✅ Railway CLI token acquired
-
-### Step 1: GitHub Export (Completed)
-Your mahSpeccy codebase is exported to a GitHub repository.
-
-### Step 2: Railway Token (Completed)
-You have acquired your Railway API token for deployments.
-
-### Step 3: Railway SDK Ingestion (In Progress)
-Use the Railway SDK Ingest component to:
-1. Download complete Railway SDK from GitHub
-2. Analyze GraphQL schema and mutations
-3. Understand deployment patterns
-4. Implement type-safe deployment functions
-
-### Step 4: Deploy to Railway (Next)
-1. Create Railway project via GraphQL API
-2. Connect GitHub repository
-3. Configure environment variables
-4. Deploy service
-5. Configure custom domain (optional)
-
-### Step 5: Integration
-1. Update frontend to call Railway Bridge for long-running operations
-2. Keep Supabase Edge Functions for standard API calls
-3. Test end-to-end flow
-
-## Environment Variables
-
-**Required for Railway Bridge:**
-```env
-# Railway Configuration
-RAILWAY_TOKEN=your_railway_api_token_here
-RAILWAY_PROJECT_ID=your_project_id_here
-RAILWAY_ENVIRONMENT_ID=your_environment_id_here
-
-# Supabase Integration
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# Trading APIs
-CTRADER_CLIENT_ID=your_ctrader_client_id
-CTRADER_CLIENT_SECRET=your_ctrader_client_secret
-FINNHUB_API_KEY=your_finnhub_api_key
-
-# Security
-ENCRYPTION_MASTER_KEY=your_encryption_master_key
+Response:
+{
+  "status": "healthy",
+  "uptime": 1234,
+  "version": "2.0.0",
+  "connections": {
+    "total": 2,
+    "inUse": 0,
+    "idle": 2
+  }
+}
 ```
 
-## Security Considerations
+### Get Account Data
+```bash
+POST /api/account
 
-### 🔒 Token Management
-- Railway API tokens are stored securely in environment variables
-- Never expose tokens in frontend code
-- Use Supabase auth for user authentication
-- Railway Bridge validates requests via Supabase auth tokens
+Body:
+{
+  "clientId": "your_client_id",
+  "clientSecret": "your_client_secret",
+  "accessToken": "your_access_token",
+  "accountId": "5150705",
+  "isDemo": true
+}
 
-### 🔒 Data Encryption
-- Sensitive data encrypted with `ENCRYPTION_MASTER_KEY`
-- WebSocket connections use secure protocols (WSS)
-- API keys never stored in plaintext
-
-### 🔒 Access Control
-- Railway Bridge validates user permissions via Supabase
-- Rate limiting implemented to prevent abuse
-- Audit logging for all critical operations
-
-## Performance Optimization
-
-### ⚡ Request Deduplication
-- Concurrent identical requests are deduplicated
-- Caching layer for frequently accessed data
-- Stale-while-revalidate pattern for optimal UX
-
-### ⚡ Connection Pooling
-- WebSocket connections are pooled and reused
-- TCP connections kept alive for efficiency
-- Automatic reconnection on failure
-
-### ⚡ Batch Operations
-- GraphQL mutations batched when possible
-- Bulk file operations optimized
-- Minimal API calls for common workflows
-
-## Monitoring & Debugging
-
-### 📊 Logging
-```typescript
-// Railway Bridge includes comprehensive logging
-console.log('🚀 [Railway Bridge] Service started');
-console.log('🔌 [WebSocket] Connected to cTrader');
-console.log('📡 [API] Request: POST /trading/execute');
-console.log('✅ [Success] Order placed: #123456');
-console.error('❌ [Error] Connection failed:', error);
+Response:
+{
+  "success": true,
+  "data": {
+    "accountId": "5150705",
+    "balance": 10000,
+    "equity": 10000,
+    "freeMargin": 10000,
+    "margin": 0,
+    "leverage": 100,
+    "isDemo": true
+  }
+}
 ```
 
-### 📊 Health Checks
-- `/health` endpoint for service status
-- Automatic alerts on failures
-- Uptime monitoring via Railway dashboard
+### Get Positions
+```bash
+POST /api/positions
 
-### 📊 Metrics
-- Request latency tracking
-- Error rate monitoring
-- WebSocket connection counts
-- Data throughput metrics
+Body: (same as above)
+
+Response:
+{
+  "success": true,
+  "data": {
+    "positions": [...],
+    "orders": [...],
+    "accountId": "5150705",
+    "isDemo": true
+  }
+}
+```
+
+### Get Symbols
+```bash
+POST /api/symbols
+
+Body: (same as above)
+
+Response:
+{
+  "success": true,
+  "data": {
+    "symbols": [
+      {
+        "symbolId": 1,
+        "symbolName": "EURUSD",
+        "enabled": true,
+        ...
+      }
+    ]
+  }
+}
+```
+
+## Connection Pooling
+
+The bridge automatically manages WebSocket connections:
+
+- **Reuses connections** for the same account
+- **Automatic cleanup** of idle connections (5 min timeout)
+- **Health checks** to detect stale connections
+- **Concurrent requests** handled via queue
+
+## Protocol Buffers
+
+cTrader uses **Protocol Buffers (protobuf)** for message encoding. This implementation:
+
+1. Encodes requests as protobuf messages
+2. Sends via WebSocket
+3. Decodes protobuf responses
+4. Returns JSON to REST clients
+
+## Error Handling
+
+All errors are returned in consistent format:
+
+```json
+{
+  "error": "Error message",
+  "code": "CTRADER_ERROR",
+  "context": "api/account",
+  "timestamp": "2025-12-07T01:00:00.000Z"
+}
+```
+
+Common error codes:
+- `CTRADER_ERROR` - cTrader API error
+- `VALIDATION_ERROR` - Invalid request
+- `TIMEOUT_ERROR` - Request timeout
+- `CONNECTION_ERROR` - WebSocket connection failed
+
+## Monitoring
+
+Check connection pool stats:
+
+```bash
+GET /stats
+
+Response:
+{
+  "uptime": 1234,
+  "connectionPool": {
+    "total": 2,
+    "inUse": 0,
+    "idle": 2,
+    "connections": ["demo_5150705"]
+  },
+  "memory": {
+    "heapUsed": 12345678,
+    "heapTotal": 23456789
+  }
+}
+```
+
+## Production Notes
+
+### Security
+- Restrict CORS origins to your Supabase domain
+- Use HTTPS only (Railway provides this automatically)
+- Never log sensitive credentials
+
+### Performance
+- Connection pool reduces latency
+- Reuses WebSocket connections
+- Handles concurrent requests efficiently
+
+### Scaling
+- Stateless design (except connection pool)
+- Can run multiple instances behind load balancer
+- Connection pool is per-instance
+
+### Maintenance
+- Monitor `/health` endpoint
+- Check `/stats` for connection pool status
+- Watch Railway logs for errors
 
 ## Troubleshooting
 
-### ⚠️ Common Issues
+### Connection timeouts
+- Check cTrader server status
+- Verify credentials are correct
+- Check firewall settings
 
-**Issue:** "TCP timeout on Supabase Edge Functions"
-- **Solution:** Use Railway Bridge for long-running operations (WebSocket, streaming)
+### Authentication errors
+- Verify Client ID and Secret
+- Check Access Token validity
+- Ensure account ID is correct
 
-**Issue:** "Railway deployment fails"
-- **Solution:** Check environment variables, review logs in Railway dashboard
-
-**Issue:** "WebSocket connection drops"
-- **Solution:** Railway Bridge includes automatic reconnection logic
-
-**Issue:** "High latency"
-- **Solution:** Enable connection pooling, check Railway region settings
-
-## Next Steps
-
-1. ✅ **Complete SDK ingestion** - Click "Ingest SDK" in Settings tab
-2. ⏳ **Implement deployment mutations** - Create Railway project via GraphQL
-3. ⏳ **Deploy Railway Bridge** - Push to Railway.app
-4. ⏳ **Test integration** - Verify WebSocket connections work
-5. ⏳ **Monitor performance** - Check logs and metrics
-
-## Resources
-
-- [Railway.app Documentation](https://docs.railway.app/)
-- [Railway GraphQL API](https://railway.app/graphql)
-- [Railway SDK GitHub](https://github.com/crisog/railway-sdk)
-- [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
-- [cTrader Open API](https://connect.spotware.com/docs/open-api)
+### Memory issues
+- Check connection pool size
+- Reduce idle timeout if needed
+- Monitor memory usage in `/stats`
 
 ## Support
 
-For issues or questions:
-1. Check Railway Bridge logs in Settings → Railway SDK Ingest
-2. Review Supabase Edge Function logs
-3. Consult Railway dashboard for deployment status
-4. Enable debug logging for detailed troubleshooting
+For issues with:
+- **cTrader API**: https://help.ctrader.com/open-api/
+- **Railway deployment**: https://docs.railway.app
+- **Protocol Buffers**: https://protobuf.dev
 
----
+## License
 
-**Last Updated:** 2025-11-26  
-**Version:** 1.0.0  
-**Status:** SDK Ingestion Ready ✅
+MIT
