@@ -124,6 +124,38 @@ function validateRequest(body: any): { valid: boolean; error?: string; credentia
 }
 
 /**
+ * Validate request body for accounts endpoint (no accountId required)
+ */
+function validateAccountsRequest(body: any): { valid: boolean; error?: string; credentials?: CTraderCredentials } {
+  if (!body) {
+    return { valid: false, error: 'Request body is required' };
+  }
+
+  const { clientId, clientSecret, accessToken, isDemo } = body;
+
+  if (!clientId) {
+    return { valid: false, error: 'clientId is required' };
+  }
+  if (!clientSecret) {
+    return { valid: false, error: 'clientSecret is required' };
+  }
+  if (!accessToken) {
+    return { valid: false, error: 'accessToken is required' };
+  }
+
+  // Use a dummy accountId since it's required by CTraderCredentials type but not used for this endpoint
+  const credentials: CTraderCredentials = {
+    clientId,
+    clientSecret,
+    accessToken,
+    accountId: '0', // Dummy value, not used for getAccounts
+    isDemo: isDemo !== false, // Default to demo for safety
+  };
+
+  return { valid: true, credentials };
+}
+
+/**
  * Handle errors consistently
  */
 function handleError(error: any, context: string) {
@@ -267,7 +299,7 @@ app.post('/api/symbols', async (c) => {
 app.post('/api/accounts', async (c) => {
   try {
     const body = await c.req.json();
-    const validation = validateRequest(body);
+    const validation = validateAccountsRequest(body);
     
     if (!validation.valid) {
       return c.json({ error: validation.error }, 400);
