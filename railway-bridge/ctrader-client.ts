@@ -318,15 +318,25 @@ export class CTraderClient {
    */
   async getSymbols(accountId: string, accessToken?: string): Promise<any> {
     if (!this.accountAuthenticated) {
+      console.error('[CTraderClient] ❌ Cannot fetch symbols - account not authenticated!');
+      console.error('[CTraderClient] App authenticated:', this.appAuthenticated);
+      console.error('[CTraderClient] Account authenticated:', this.accountAuthenticated);
       throw new Error('Account not authenticated');
     }
 
     console.log('[CTraderClient] Fetching symbols...');
+    console.log('[CTraderClient] Account ID:', accountId);
+    console.log('[CTraderClient] Access Token provided:', !!accessToken);
+    console.log('[CTraderClient] App authenticated:', this.appAuthenticated);
+    console.log('[CTraderClient] Account authenticated:', this.accountAuthenticated);
     
     const request: SymbolsListReq = {
       ctidTraderAccountId: parseInt(accountId),
-      ...(accessToken && { accessToken }), // Include accessToken if provided
+      // Note: accessToken is NOT part of ProtoOASymbolsListReq schema
+      // Authentication should already be established via AccountAuthReq
     };
+    
+    console.log('[CTraderClient] Sending symbols request:', request);
     
     const response = await this.sendRequest(
       ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ,
@@ -334,6 +344,7 @@ export class CTraderClient {
       60000 // 60s timeout for symbols (large response)
     );
     
+    console.log('[CTraderClient] ✅ Symbols fetched successfully');
     return response;
   }
 
