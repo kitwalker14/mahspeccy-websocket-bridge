@@ -12,7 +12,7 @@ const PROTO_DIR = new URL('./proto/', import.meta.url).pathname;
 
 export class ProtoLoader {
   private root: protobuf.Root | null = null;
-  private ProtoMessageType: protobuf.Type | null = null;
+  private protoMessages: Record<string, protobuf.Type> = {};
   
   /**
    * Load all proto files
@@ -39,9 +39,51 @@ export class ProtoLoader {
       }
       
       // Get ProtoMessage type (wrapper for all messages)
-      this.ProtoMessageType = this.root.lookupType('ProtoMessage');
+      const ProtoMessageType = this.root.lookupType('ProtoMessage');
       
       console.log('[ProtoLoader] ✅ Protocol Buffers loaded successfully');
+      
+      // Populate protoMessages map
+      const typeMap: Record<number, string> = {
+        // Application Auth
+        [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_REQ]: 'ProtoOAApplicationAuthReq',
+        [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES]: 'ProtoOAApplicationAuthRes',
+        
+        // Account Auth
+        [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ]: 'ProtoOAAccountAuthReq',
+        [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES]: 'ProtoOAAccountAuthRes',
+        
+        // Trader (Account Info)
+        [ProtoOAPayloadType.PROTO_OA_TRADER_REQ]: 'ProtoOATraderReq',
+        [ProtoOAPayloadType.PROTO_OA_TRADER_RES]: 'ProtoOATraderRes',
+        
+        // Reconcile (Positions)
+        [ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ]: 'ProtoOAReconcileReq',
+        [ProtoOAPayloadType.PROTO_OA_RECONCILE_RES]: 'ProtoOAReconcileRes',
+        
+        // Symbols
+        [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ]: 'ProtoOASymbolsListReq',
+        [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES]: 'ProtoOASymbolsListRes',
+        
+        // Accounts by token
+        [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
+        [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES]: 'ProtoOAGetAccountListByAccessTokenRes',
+        
+        // Error
+        [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
+        
+        // Heartbeat (common)
+        [51]: 'ProtoHeartbeatEvent',
+      };
+      
+      for (const [payloadType, messageTypeName] of Object.entries(typeMap)) {
+        const MessageType = this.root.lookupType(messageTypeName);
+        if (MessageType) {
+          this.protoMessages[messageTypeName] = MessageType;
+        } else {
+          console.warn(`[ProtoLoader] Message type not found: ${messageTypeName}`);
+        }
+      }
     } catch (error) {
       console.error('[ProtoLoader] ❌ Failed to load proto files:', error);
       throw error;
@@ -49,32 +91,59 @@ export class ProtoLoader {
   }
   
   /**
-   * Encode a ProtoOA message
+   * Encode message with Protocol Buffers
    */
-  encodeMessage(payloadType: ProtoOAPayloadType, payload: any, clientMsgId?: string): Uint8Array {
-    if (!this.root || !this.ProtoMessageType) {
-      throw new Error('Proto files not loaded. Call load() first.');
+  encodeMessage(payloadType: number, payload: any, clientMsgId?: string): Uint8Array {
+    if (!this.protoMessages) {
+      throw new Error('Protocol Buffers not loaded');
+    }
+
+    // Get payload type name
+    const payloadTypeName = this.getPayloadTypeName(payloadType);
+    console.log(`[ProtoLoader] 🔧 Encoding ${payloadTypeName}...`);
+    console.log(`[ProtoLoader] 📦 Payload:`, JSON.stringify(payload, null, 2));
+    
+    // Get message type
+    const MessageType = this.protoMessages[payloadTypeName];
+    if (!MessageType) {
+      throw new Error(`Message type not found: ${payloadTypeName}`);
+    }
+
+    // Log the message schema
+    console.log(`[ProtoLoader] 📋 Message schema fields:`, Object.keys(MessageType.fields || {}));
+    
+    // Verify the message
+    const errMsg = MessageType.verify(payload);
+    if (errMsg) {
+      console.error(`[ProtoLoader] ❌ Verification failed: ${errMsg}`);
+      throw new Error(`Message verification failed: ${errMsg}`);
     }
     
-    // Get message type name from enum
-    const messageTypeName = this.getMessageTypeName(payloadType);
+    // Create and encode the payload message
+    const payloadMessage = MessageType.create(payload);
+    console.log(`[ProtoLoader] ✅ Created message:`, JSON.stringify(MessageType.toObject(payloadMessage), null, 2));
     
-    // Look up the message type
-    const PayloadMessageType = this.root.lookupType(messageTypeName);
-    
-    // Create and encode payload
-    const payloadMessage = PayloadMessageType.create(payload);
-    const payloadBytes = PayloadMessageType.encode(payloadMessage).finish();
-    
+    const payloadBytes = MessageType.encode(payloadMessage).finish();
+    console.log(`[ProtoLoader] 📊 Encoded payload size: ${payloadBytes.length} bytes`);
+    console.log(`[ProtoLoader] 🔍 Encoded payload (hex):`, Array.from(payloadBytes.slice(0, 50)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+
     // Create ProtoMessage wrapper
-    const protoMessage = this.ProtoMessageType.create({
+    const ProtoMessage = this.root?.lookupType('ProtoMessage');
+    if (!ProtoMessage) {
+      throw new Error('ProtoMessage type not found');
+    }
+
+    const wrapper = {
       payloadType,
       payload: payloadBytes,
-      clientMsgId,
-    });
+      clientMsgId: clientMsgId || `msg_${Date.now()}`,
+    };
+
+    const message = ProtoMessage.create(wrapper);
+    const encoded = ProtoMessage.encode(message).finish();
     
-    // Encode and return
-    return this.ProtoMessageType.encode(protoMessage).finish();
+    console.log(`[ProtoLoader] ✅ Final message size: ${encoded.length} bytes`);
+    return encoded;
   }
   
   /**
@@ -114,6 +183,52 @@ export class ProtoLoader {
    * Get message type name from payload type number
    */
   private getMessageTypeName(payloadType: number): string {
+    // Map payload type numbers to message type names
+    const typeMap: Record<number, string> = {
+      // Application Auth
+      [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_REQ]: 'ProtoOAApplicationAuthReq',
+      [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES]: 'ProtoOAApplicationAuthRes',
+      
+      // Account Auth
+      [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ]: 'ProtoOAAccountAuthReq',
+      [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES]: 'ProtoOAAccountAuthRes',
+      
+      // Trader (Account Info)
+      [ProtoOAPayloadType.PROTO_OA_TRADER_REQ]: 'ProtoOATraderReq',
+      [ProtoOAPayloadType.PROTO_OA_TRADER_RES]: 'ProtoOATraderRes',
+      
+      // Reconcile (Positions)
+      [ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ]: 'ProtoOAReconcileReq',
+      [ProtoOAPayloadType.PROTO_OA_RECONCILE_RES]: 'ProtoOAReconcileRes',
+      
+      // Symbols
+      [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ]: 'ProtoOASymbolsListReq',
+      [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES]: 'ProtoOASymbolsListRes',
+      
+      // Accounts by token
+      [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
+      [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES]: 'ProtoOAGetAccountListByAccessTokenRes',
+      
+      // Error
+      [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
+      
+      // Heartbeat (common)
+      [51]: 'ProtoHeartbeatEvent',
+    };
+    
+    const name = typeMap[payloadType];
+    if (!name) {
+      console.warn(`[ProtoLoader] Unknown payload type: ${payloadType}`);
+      return 'UnknownMessage';
+    }
+    
+    return name;
+  }
+  
+  /**
+   * Get payload type name from payload type number
+   */
+  private getPayloadTypeName(payloadType: number): string {
     // Map payload type numbers to message type names
     const typeMap: Record<number, string> = {
       // Application Auth

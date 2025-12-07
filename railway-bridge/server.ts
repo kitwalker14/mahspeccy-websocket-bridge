@@ -272,7 +272,7 @@ app.post('/api/symbols', async (c) => {
 
     // Use connection pool to execute request
     const symbolsData = await connectionPool.withConnection(credentials, async (client) => {
-      return await client.getSymbols(credentials.accountId, credentials.accessToken);
+      return await client.getSymbols(credentials.accountId);
     });
 
     console.log(`[Symbols] ✅ Success - ${symbolsData.symbol?.length || 0} symbols`);

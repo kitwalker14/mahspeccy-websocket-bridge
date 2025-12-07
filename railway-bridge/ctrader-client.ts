@@ -316,24 +316,24 @@ export class CTraderClient {
   /**
    * Get symbols list
    */
-  async getSymbols(accountId: string, accessToken: string): Promise<any> {
+  async getSymbols(accountId: string): Promise<any> {
     if (!this.accountAuthenticated) {
       console.error('[CTraderClient] ❌ Cannot fetch symbols - account not authenticated!');
       console.error('[CTraderClient] App authenticated:', this.appAuthenticated);
       console.error('[CTraderClient] Account authenticated:', this.accountAuthenticated);
-      throw new Error('Account not authenticated');
+      throw new Error('Account not authenticated - must call fullAuth() first');
     }
 
-    console.log('[CTraderClient] Fetching symbols...');
-    console.log('[CTraderClient] Account ID:', accountId);
-    console.log('[CTraderClient] Access Token provided:', !!accessToken);
+    console.log('[CTraderClient] 🔍 Fetching symbols for account:', accountId);
+    console.log('[CTraderClient] Authentication state: app=' + this.appAuthenticated + ', account=' + this.accountAuthenticated);
     
     const request: SymbolsListReq = {
       ctidTraderAccountId: parseInt(accountId),
-      accessToken, // REQUIRED by some broker configurations (Spotware demo)
+      // accessToken is NOT needed here - account is already authenticated via ProtoOAAccountAuthReq
     };
     
-    console.log('[CTraderClient] Sending symbols request with accessToken');
+    console.log('[CTraderClient] 📋 Request:', JSON.stringify(request, null, 2));
+    console.log('[CTraderClient] 🚀 Sending PROTO_OA_SYMBOLS_LIST_REQ...');
     
     const response = await this.sendRequest(
       ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ,

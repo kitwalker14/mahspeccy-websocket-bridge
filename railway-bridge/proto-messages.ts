@@ -97,7 +97,6 @@ export interface TraderRes {
 export interface SymbolsListReq {
   ctidTraderAccountId: number;
   includeArchivedSymbols?: boolean;
-  accessToken?: string; // Required by some broker configurations
 }
 
 export interface SymbolsListRes {
