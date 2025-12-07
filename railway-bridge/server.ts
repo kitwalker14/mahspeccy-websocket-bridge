@@ -189,5 +189,111 @@ export function createServer(environment: 'demo' | 'live') {
     return c.json(stats);
   });
   
+  // ============================================================================
+  // REST API ENDPOINTS (for Supabase Edge Function integration)
+  // ============================================================================
+  
+  /**
+   * POST /api/account
+   * Get account data (balance, equity, margin) via REST
+   */
+  app.post('/api/account', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { clientId, clientSecret, accessToken, accountId, environment: env } = body;
+      
+      if (!clientId || !clientSecret || !accessToken || !accountId) {
+        return c.json({ error: 'Missing required fields' }, 400);
+      }
+      
+      console.log(`📊 [REST API] Account request for ${accountId} (${env})`);
+      
+      // Create temporary connection for this request
+      const userId = `rest_${accountId}_${Date.now()}`;
+      const credentials = { clientId, clientSecret, accessToken, accountId };
+      
+      const tcpConnection = await connectionManager.getConnection(userId, credentials);
+      
+      // Send account info request
+      const accountData = await messageRouter.requestAccountInfo(tcpConnection, accountId);
+      
+      // Cleanup connection
+      await connectionManager.closeConnection(userId);
+      
+      return c.json(accountData);
+    } catch (error: any) {
+      console.error('❌ [REST API] Account error:', error);
+      return c.json({ error: error.message }, 500);
+    }
+  });
+  
+  /**
+   * POST /api/positions
+   * Get positions, orders, and deals via REST
+   */
+  app.post('/api/positions', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { clientId, clientSecret, accessToken, accountId, environment: env } = body;
+      
+      if (!clientId || !clientSecret || !accessToken || !accountId) {
+        return c.json({ error: 'Missing required fields' }, 400);
+      }
+      
+      console.log(`📍 [REST API] Positions request for ${accountId} (${env})`);
+      
+      // Create temporary connection for this request
+      const userId = `rest_${accountId}_${Date.now()}`;
+      const credentials = { clientId, clientSecret, accessToken, accountId };
+      
+      const tcpConnection = await connectionManager.getConnection(userId, credentials);
+      
+      // Send positions/orders request
+      const positionsData = await messageRouter.requestPositions(tcpConnection, accountId);
+      
+      // Cleanup connection
+      await connectionManager.closeConnection(userId);
+      
+      return c.json(positionsData);
+    } catch (error: any) {
+      console.error('❌ [REST API] Positions error:', error);
+      return c.json({ error: error.message }, 500);
+    }
+  });
+  
+  /**
+   * POST /api/symbols
+   * Get available symbols via REST
+   */
+  app.post('/api/symbols', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { clientId, clientSecret, accessToken, accountId, environment: env } = body;
+      
+      if (!clientId || !clientSecret || !accessToken || !accountId) {
+        return c.json({ error: 'Missing required fields' }, 400);
+      }
+      
+      console.log(`📋 [REST API] Symbols request for ${accountId} (${env})`);
+      
+      // Create temporary connection for this request
+      const userId = `rest_${accountId}_${Date.now()}`;
+      const credentials = { clientId, clientSecret, accessToken, accountId };
+      
+      const tcpConnection = await connectionManager.getConnection(userId, credentials);
+      
+      // Send symbols request
+      const symbolsData = await messageRouter.requestSymbols(tcpConnection, accountId);
+      
+      // Cleanup connection
+      await connectionManager.closeConnection(userId);
+      
+      return c.json(symbolsData);
+    } catch (error: any) {
+      console.error('❌ [REST API] Symbols error:', error);
+      return c.json({ error: error.message }, 500);
+    }
+  });
+  
   return app;
 }
