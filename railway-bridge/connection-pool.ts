@@ -51,9 +51,9 @@ export class ConnectionPool {
   }
 
   /**
-   * Get or create connection
+   * Get or create connection for credentials
    */
-  async getConnection(credentials: CTraderCredentials): Promise<CTraderClient> {
+  async getConnection(credentials: CTraderCredentials, skipAccountAuth = false): Promise<CTraderClient> {
     const key = this.getKey(credentials);
     
     // Check if we have an existing connection
@@ -72,7 +72,13 @@ export class ConnectionPool {
     try {
       // Connect and authenticate
       await client.connect();
-      await client.fullAuth(credentials);
+      
+      // For getAccounts endpoint, we only need app auth
+      if (skipAccountAuth) {
+        await client.authenticateApp(credentials.clientId, credentials.clientSecret);
+      } else {
+        await client.fullAuth(credentials);
+      }
       
       // Store in pool
       this.connections.set(key, {
@@ -109,9 +115,10 @@ export class ConnectionPool {
    */
   async withConnection<T>(
     credentials: CTraderCredentials,
-    callback: (client: CTraderClient) => Promise<T>
+    callback: (client: CTraderClient) => Promise<T>,
+    skipAccountAuth = false
   ): Promise<T> {
-    const client = await this.getConnection(credentials);
+    const client = await this.getConnection(credentials, skipAccountAuth);
     
     try {
       const result = await callback(client);

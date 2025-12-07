@@ -312,7 +312,7 @@ app.post('/api/accounts', async (c) => {
     const accountsData = await connectionPool.withConnection(credentials, async (client) => {
       // Disconnect account auth for this request
       return await client.getAccounts(credentials.accessToken);
-    });
+    }, true); // ✅ Skip account auth for getAccounts endpoint
 
     console.log(`[Accounts] ✅ Success - ${accountsData.ctidTraderAccount?.length || 0} accounts`);
 
