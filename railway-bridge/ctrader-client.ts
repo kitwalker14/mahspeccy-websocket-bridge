@@ -40,6 +40,7 @@ export class CTraderClient {
     timeout: number;
   }>();
   private heartbeatInterval: number | null = null;
+  private accessToken: string;
 
   constructor(isDemo: boolean) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
@@ -292,6 +293,7 @@ export class CTraderClient {
     );
     
     this.accountAuthenticated = true;
+    this.accessToken = accessToken; // Store accessToken for later use
     console.log('[CTraderClient] ✅ Account authenticated');
   }
 
@@ -355,7 +357,7 @@ export class CTraderClient {
     
     const request: SymbolsListReq = {
       ctidTraderAccountId: parseInt(accountId),
-      // accessToken is NOT needed here - account is already authenticated via ProtoOAAccountAuthReq
+      accessToken: this.accessToken, // REQUIRED by cTrader API
     };
     
     console.log('[CTraderClient] 📋 Request:', JSON.stringify(request, null, 2));
