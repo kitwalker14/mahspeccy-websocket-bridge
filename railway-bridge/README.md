@@ -1,6 +1,6 @@
 # Railway Bridge - cTrader WebSocket-to-REST Adapter
 
-**Production-ready WebSocket bridge for cTrader Open API**
+**Production-ready WebSocket bridge for cTrader Open API with full Protocol Buffers support**
 
 ## Architecture
 
@@ -10,12 +10,40 @@ Supabase Backend → Railway Bridge (REST) → cTrader (WebSocket + ProtoOA)
 
 ## Features
 
-✅ **Full cTrader ProtoOA Protocol** - Complete Protocol Buffers implementation  
+✅ **Full cTrader ProtoOA Protocol Buffers** - Complete implementation with all message types  
+✅ **Real Protocol Buffers encoding/decoding** - No JSON placeholders, 100% compliant  
 ✅ **WebSocket Connection Pooling** - Reuse connections for performance  
 ✅ **Automatic Authentication** - Handles app + account auth flow  
 ✅ **Error Handling** - Comprehensive error handling and logging  
 ✅ **Health Checks** - Monitor connection pool status  
 ✅ **Graceful Shutdown** - Clean disconnection on server stop  
+
+## Technology Stack
+
+- **Runtime**: Deno (TypeScript)
+- **Framework**: Hono (fast web framework)
+- **Protocol**: cTrader ProtoOA 2.0 with Protocol Buffers
+- **Transport**: WebSocket (WSS)
+- **Deployment**: Railway
+
+## Protocol Buffers Implementation
+
+This bridge includes **full Protocol Buffers support** with:
+
+1. ✅ All 4 `.proto` files from cTrader Open API documentation
+2. ✅ Complete message type definitions (2100-2188)
+3. ✅ Proper encoding/decoding for all requests/responses
+4. ✅ Type-safe TypeScript interfaces
+
+### Proto Files
+
+```
+proto/
+├── OpenApiCommonMessages.proto       # Base ProtoMessage wrapper
+├── OpenApiCommonModelMessages.proto  # Common enums and types
+├── OpenApiMessages.proto             # ProtoOA request/response messages
+└── OpenApiModelMessages.proto        # ProtoOA data models and enums
+```
 
 ## Quick Start
 

@@ -369,4 +369,10 @@ console.log(`🌐 Server starting on port ${PORT}...`);
 console.log('='.repeat(60));
 console.log('');
 
+// Initialize Protocol Buffers before starting server
+console.log('[Server] Initializing Protocol Buffers...');
+await connectionPool.initialize();
+console.log('[Server] ✅ Protocol Buffers initialized');
+console.log('');
+
 Deno.serve({ port: PORT }, app.fetch);

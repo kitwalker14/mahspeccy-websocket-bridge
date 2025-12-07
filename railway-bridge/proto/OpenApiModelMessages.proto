@@ -1,0 +1,715 @@
+syntax = "proto2";
+
+option go_package = "/openapi";
+
+option java_multiple_files = true;
+
+option java_generate_equals_and_hash = true;
+
+option java_package = "com.xtrader.protocol.openapi.v2.model";
+
+option java_outer_classname = "ContainerOpenApiV2ModelMessages";
+
+enum ProtoOAPayloadType {
+    PROTO_OA_APPLICATION_AUTH_REQ = 2100;
+    PROTO_OA_APPLICATION_AUTH_RES = 2101;
+    PROTO_OA_ACCOUNT_AUTH_REQ = 2102;
+    PROTO_OA_ACCOUNT_AUTH_RES = 2103;
+    PROTO_OA_VERSION_REQ = 2104;
+    PROTO_OA_VERSION_RES = 2105;
+    PROTO_OA_NEW_ORDER_REQ = 2106;
+    PROTO_OA_TRAILING_SL_CHANGED_EVENT = 2107;
+    PROTO_OA_CANCEL_ORDER_REQ = 2108;
+    PROTO_OA_AMEND_ORDER_REQ = 2109;
+    PROTO_OA_AMEND_POSITION_SLTP_REQ = 2110;
+    PROTO_OA_CLOSE_POSITION_REQ = 2111;
+    PROTO_OA_ASSET_LIST_REQ = 2112;
+    PROTO_OA_ASSET_LIST_RES = 2113;
+    PROTO_OA_SYMBOLS_LIST_REQ = 2114;
+    PROTO_OA_SYMBOLS_LIST_RES = 2115;
+    PROTO_OA_SYMBOL_BY_ID_REQ = 2116;
+    PROTO_OA_SYMBOL_BY_ID_RES = 2117;
+    PROTO_OA_SYMBOLS_FOR_CONVERSION_REQ = 2118;
+    PROTO_OA_SYMBOLS_FOR_CONVERSION_RES = 2119;
+    PROTO_OA_SYMBOL_CHANGED_EVENT = 2120;
+    PROTO_OA_TRADER_REQ = 2121;
+    PROTO_OA_TRADER_RES = 2122;
+    PROTO_OA_TRADER_UPDATE_EVENT = 2123;
+    PROTO_OA_RECONCILE_REQ = 2124;
+    PROTO_OA_RECONCILE_RES = 2125;
+    PROTO_OA_EXECUTION_EVENT = 2126;
+    PROTO_OA_SUBSCRIBE_SPOTS_REQ = 2127;
+    PROTO_OA_SUBSCRIBE_SPOTS_RES = 2128;
+    PROTO_OA_UNSUBSCRIBE_SPOTS_REQ = 2129;
+    PROTO_OA_UNSUBSCRIBE_SPOTS_RES = 2130;
+    PROTO_OA_SPOT_EVENT = 2131;
+    PROTO_OA_ORDER_ERROR_EVENT = 2132;
+    PROTO_OA_DEAL_LIST_REQ = 2133;
+    PROTO_OA_DEAL_LIST_RES = 2134;
+    PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ = 2135;
+    PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQ = 2136;
+    PROTO_OA_GET_TRENDBARS_REQ = 2137;
+    PROTO_OA_GET_TRENDBARS_RES = 2138;
+    PROTO_OA_EXPECTED_MARGIN_REQ = 2139;
+    PROTO_OA_EXPECTED_MARGIN_RES = 2140;
+    PROTO_OA_MARGIN_CHANGED_EVENT = 2141;
+    PROTO_OA_ERROR_RES = 2142;
+    PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ = 2143;
+    PROTO_OA_CASH_FLOW_HISTORY_LIST_RES = 2144;
+    PROTO_OA_GET_TICKDATA_REQ = 2145;
+    PROTO_OA_GET_TICKDATA_RES = 2146;
+    PROTO_OA_ACCOUNTS_TOKEN_INVALIDATED_EVENT = 2147;
+    PROTO_OA_CLIENT_DISCONNECT_EVENT = 2148;
+    PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ = 2149;
+    PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES = 2150;
+    PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_REQ = 2151;
+    PROTO_OA_GET_CTID_PROFILE_BY_TOKEN_RES = 2152;
+    PROTO_OA_ASSET_CLASS_LIST_REQ = 2153;
+    PROTO_OA_ASSET_CLASS_LIST_RES = 2154;
+    PROTO_OA_DEPTH_EVENT = 2155;
+    PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_REQ = 2156;
+    PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_RES = 2157;
+    PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_REQ = 2158;
+    PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_RES = 2159;
+    PROTO_OA_SYMBOL_CATEGORY_REQ = 2160;
+    PROTO_OA_SYMBOL_CATEGORY_RES = 2161;
+    PROTO_OA_ACCOUNT_LOGOUT_REQ = 2162;
+    PROTO_OA_ACCOUNT_LOGOUT_RES = 2163;
+    PROTO_OA_ACCOUNT_DISCONNECT_EVENT = 2164;
+    PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_RES = 2165;
+    PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_RES = 2166;
+    PROTO_OA_MARGIN_CALL_LIST_REQ = 2167;
+    PROTO_OA_MARGIN_CALL_LIST_RES = 2168;
+    PROTO_OA_MARGIN_CALL_UPDATE_REQ = 2169;
+    PROTO_OA_MARGIN_CALL_UPDATE_RES = 2170;
+    PROTO_OA_MARGIN_CALL_UPDATE_EVENT = 2171;
+    PROTO_OA_MARGIN_CALL_TRIGGER_EVENT = 2172;
+    PROTO_OA_REFRESH_TOKEN_REQ = 2173;
+    PROTO_OA_REFRESH_TOKEN_RES = 2174;
+    PROTO_OA_ORDER_LIST_REQ = 2175;
+    PROTO_OA_ORDER_LIST_RES = 2176;
+    PROTO_OA_GET_DYNAMIC_LEVERAGE_REQ = 2177;
+    PROTO_OA_GET_DYNAMIC_LEVERAGE_RES = 2178;
+    PROTO_OA_DEAL_LIST_BY_POSITION_ID_REQ = 2179;
+    PROTO_OA_DEAL_LIST_BY_POSITION_ID_RES = 2180;
+    PROTO_OA_ORDER_DETAILS_REQ = 2181;
+    PROTO_OA_ORDER_DETAILS_RES = 2182;
+    PROTO_OA_ORDER_LIST_BY_POSITION_ID_REQ = 2183;
+    PROTO_OA_ORDER_LIST_BY_POSITION_ID_RES = 2184;
+    PROTO_OA_DEAL_OFFSET_LIST_REQ = 2185;
+    PROTO_OA_DEAL_OFFSET_LIST_RES = 2186;
+    PROTO_OA_GET_POSITION_UNREALIZED_PNL_REQ = 2187;
+    PROTO_OA_GET_POSITION_UNREALIZED_PNL_RES = 2188;
+}
+
+/** Asset entity. */
+message ProtoOAAsset {
+    required int64 assetId = 1;
+    required string name = 2;
+    optional string displayName = 3;
+    optional int32 digits = 4;
+}
+
+/** Trading symbol entity. */
+message ProtoOASymbol {
+    required int64 symbolId = 1;
+    required int32 digits = 2;
+    required int32 pipPosition = 3;
+    optional bool enableShortSelling = 4;
+    optional bool guaranteedStopLoss = 5;
+    optional ProtoOADayOfWeek swapRollover3Days = 6 [default = MONDAY];
+    optional double swapLong = 7;
+    optional double swapShort = 8;
+    optional int64 maxVolume = 9;
+    optional int64 minVolume = 10;
+    optional int64 stepVolume = 11;
+    optional uint64 maxExposure = 12;
+    repeated ProtoOAInterval schedule = 13;
+    optional int64 commission = 14 [deprecated = true];
+    optional ProtoOACommissionType commissionType = 15 [default = USD_PER_MILLION_USD];
+    optional uint32 slDistance = 16;
+    optional uint32 tpDistance = 17;
+    optional uint32 gslDistance = 18;
+    optional int64 gslCharge = 19;
+    optional ProtoOASymbolDistanceType distanceSetIn = 20 [default = SYMBOL_DISTANCE_IN_POINTS];
+    optional int64 minCommission = 21 [deprecated = true];
+    optional ProtoOAMinCommissionType minCommissionType = 22 [default = CURRENCY];
+    optional string minCommissionAsset = 23 [default = "USD"];
+    optional int64 rolloverCommission = 24;
+    optional int32 skipRolloverDays = 25;
+    optional string scheduleTimeZone = 26;
+    optional ProtoOATradingMode tradingMode = 27 [default = ENABLED];
+    optional ProtoOADayOfWeek rolloverCommission3Days = 28 [default = MONDAY];
+    optional ProtoOASwapCalculationType swapCalculationType = 29 [default = PIPS];
+    optional int64 lotSize = 30;
+    optional int64 preciseTradingCommissionRate = 31;
+    optional int64 preciseMinCommission = 32;
+    repeated ProtoOAHoliday holiday = 33;
+    optional int32 pnlConversionFeeRate = 34;
+    optional int64 leverageId = 35;
+    optional int32 swapPeriod = 36;
+    optional int32 swapTime = 37;
+    optional int32 skipSWAPPeriods = 38;
+    optional bool chargeSwapAtWeekends = 39;
+    optional string measurementUnits = 40;
+}
+
+/** Lightweight symbol entity. */
+message ProtoOALightSymbol {
+    required int64 symbolId = 1;
+    optional string symbolName = 2;
+    optional bool enabled = 3;
+    optional int64 baseAssetId = 4;
+    optional int64 quoteAssetId = 5;
+    optional int64 symbolCategoryId = 6;
+    optional string description = 7;
+    optional double sortingNumber = 8;
+}
+
+message ProtoOAArchivedSymbol {
+    required int64 symbolId = 1;
+    required string name = 2;
+    required int64 utcLastUpdateTimestamp = 3;
+    optional string description = 4;
+}
+
+/** Symbol category entity. */
+message ProtoOASymbolCategory {
+    required int64 id = 1;
+    required int64 assetClassId = 2;
+    required string name = 3;
+    optional double sortingNumber = 4;
+}
+
+enum ProtoOADayOfWeek {
+    NONE = 0;
+    MONDAY = 1;
+    TUESDAY = 2;
+    WEDNESDAY = 3;
+    THURSDAY = 4;
+    FRIDAY = 5;
+    SATURDAY = 6;
+    SUNDAY = 7;
+}
+
+/** Symbol trading session entity. */
+message ProtoOAInterval {
+    required uint32 startSecond = 3;
+    required uint32 endSecond = 4;
+}
+
+/** Enum for specifying type of trading commission. */
+enum ProtoOACommissionType {
+    USD_PER_MILLION_USD = 1;
+    USD_PER_LOT = 2;
+    PERCENTAGE_OF_VALUE = 3;
+    QUOTE_CCY_PER_LOT = 4;
+}
+
+/** Enum for specifying stop loss and take profit distances. */
+enum ProtoOASymbolDistanceType {
+    SYMBOL_DISTANCE_IN_POINTS = 1;
+    SYMBOL_DISTANCE_IN_PERCENTAGE = 2;
+}
+
+/** Enum for specifying type of minimum trading commission. */
+enum ProtoOAMinCommissionType {
+    CURRENCY = 1;
+    QUOTE_CURRENCY = 2;
+}
+
+/** Enum for specifying symbol trading mode. */
+enum ProtoOATradingMode {
+    ENABLED = 0;
+    DISABLED_WITHOUT_PENDINGS_EXECUTION = 1;
+    DISABLED_WITH_PENDINGS_EXECUTION = 2;
+    CLOSE_ONLY_MODE = 3;
+}
+
+/** Enum for specifying SWAP calculation type for symbol. */
+enum ProtoOASwapCalculationType {
+    PIPS = 0;
+    PERCENTAGE = 1;
+    POINTS = 2;
+}
+
+/** Enum for specifying access right for a trader. */
+enum ProtoOAAccessRights {
+    FULL_ACCESS = 0;
+    CLOSE_ONLY = 1;
+    NO_TRADING = 2;
+    NO_LOGIN = 3;
+}
+
+/** Enum for specifying margin calculation type for an account. */
+enum ProtoOATotalMarginCalculationType {
+    MAX = 0;
+    SUM = 1;
+    NET = 2;
+}
+
+/** Enum for specifying type of an account. */
+enum ProtoOAAccountType {
+    HEDGED = 0;
+    NETTED = 1;
+    SPREAD_BETTING = 2;
+}
+
+/** Trading account entity. */
+message ProtoOATrader {
+    required int64 ctidTraderAccountId = 1;
+    required int64 balance = 2;
+    optional int64 balanceVersion = 3;
+    optional int64 managerBonus = 4;
+    optional int64 ibBonus = 5;
+    optional int64 nonWithdrawableBonus = 6;
+    optional ProtoOAAccessRights accessRights = 7 [default = FULL_ACCESS];
+    required int64 depositAssetId = 8;
+    optional bool swapFree = 9;
+    optional uint32 leverageInCents = 10;
+    optional ProtoOATotalMarginCalculationType totalMarginCalculationType = 11;
+    optional uint32 maxLeverage = 12;
+    optional bool frenchRisk = 13 [deprecated = true];
+    optional int64 traderLogin = 14;
+    optional ProtoOAAccountType accountType = 15 [default = HEDGED];
+    optional string brokerName = 16;
+    optional int64 registrationTimestamp = 17;
+    optional bool isLimitedRisk = 18;
+    optional ProtoOALimitedRiskMarginCalculationStrategy limitedRiskMarginCalculationStrategy = 19 [default = ACCORDING_TO_LEVERAGE];
+    optional uint32 moneyDigits = 20;
+    optional bool fairStopOut = 21;
+    optional ProtoOAStopOutStrategy stopOutStrategy = 22 [default = MOST_MARGIN_USED_FIRST];
+}
+
+/** Position status ENUM. */
+enum ProtoOAPositionStatus {
+    POSITION_STATUS_OPEN = 1;
+    POSITION_STATUS_CLOSED = 2;
+    POSITION_STATUS_CREATED = 3;
+    POSITION_STATUS_ERROR = 4;
+}
+
+/** Trader side ENUM. Used for order, position, deal. */
+enum ProtoOATradeSide {
+    BUY = 1;
+    SELL = 2;
+}
+
+/** Order type ENUM. */
+enum ProtoOAOrderType {
+    MARKET = 1;
+    LIMIT = 2;
+    STOP = 3;
+    STOP_LOSS_TAKE_PROFIT = 4;
+    MARKET_RANGE = 5;
+    STOP_LIMIT = 6;
+}
+
+/** Order's time in force ENUM. */
+enum ProtoOATimeInForce {
+    GOOD_TILL_DATE = 1;
+    GOOD_TILL_CANCEL = 2;
+    IMMEDIATE_OR_CANCEL = 3;
+    FILL_OR_KILL = 4;
+    MARKET_ON_OPEN = 5;
+}
+
+/** Order status ENUM. */
+enum ProtoOAOrderStatus {
+    ORDER_STATUS_ACCEPTED = 1;
+    ORDER_STATUS_FILLED = 2;
+    ORDER_STATUS_REJECTED = 3;
+    ORDER_STATUS_EXPIRED = 4;
+    ORDER_STATUS_CANCELLED = 5;
+}
+
+/** Stop Order and Stop Loss triggering method ENUM. */
+enum ProtoOAOrderTriggerMethod {
+    TRADE = 1;
+    OPPOSITE = 2;
+    DOUBLE_TRADE = 3;
+    DOUBLE_OPPOSITE = 4;
+}
+
+/** Trade position entity. */
+message ProtoOAPosition {
+    required int64 positionId = 1;
+    required ProtoOATradeData tradeData = 2;
+    required ProtoOAPositionStatus positionStatus = 3;
+    required int64 swap = 4;
+    optional double price = 5;
+    optional double stopLoss = 6;
+    optional double takeProfit = 7;
+    optional int64 utcLastUpdateTimestamp = 8;
+    optional int64 commission = 9;
+    optional double marginRate = 10;
+    optional int64 mirroringCommission = 11;
+    optional bool guaranteedStopLoss = 12;
+    optional uint64 usedMargin = 13;
+    optional ProtoOAOrderTriggerMethod stopLossTriggerMethod = 14 [default = TRADE];
+    optional uint32 moneyDigits = 15;
+    optional bool trailingStopLoss = 16;
+}
+
+/** Position/order trading details entity. */
+message ProtoOATradeData {
+    required int64 symbolId = 1;
+    required int64 volume = 2;
+    required ProtoOATradeSide tradeSide = 3;
+    optional int64 openTimestamp = 4;
+    optional string label = 5;
+    optional bool guaranteedStopLoss = 6;
+    optional string comment = 7;
+    optional string measurementUnits = 8;
+    optional uint64 closeTimestamp = 9;
+}
+
+/** Trade order entity. */
+message ProtoOAOrder {
+    required int64 orderId = 1;
+    required ProtoOATradeData tradeData = 2;
+    required ProtoOAOrderType orderType = 3;
+    required ProtoOAOrderStatus orderStatus = 4;
+    optional int64 expirationTimestamp = 6;
+    optional double executionPrice = 7;
+    optional int64 executedVolume = 8;
+    optional int64 utcLastUpdateTimestamp = 9;
+    optional double baseSlippagePrice = 10;
+    optional int64 slippageInPoints = 11;
+    optional bool closingOrder = 12;
+    optional double limitPrice = 13;
+    optional double stopPrice = 14;
+    optional double stopLoss = 15;
+    optional double takeProfit = 16;
+    optional string clientOrderId = 17;
+    optional ProtoOATimeInForce timeInForce = 18 [default = IMMEDIATE_OR_CANCEL];
+    optional int64 positionId = 19;
+    optional int64 relativeStopLoss = 20;
+    optional int64 relativeTakeProfit = 21;
+    optional bool isStopOut = 22;
+    optional bool trailingStopLoss = 23;
+    optional ProtoOAOrderTriggerMethod stopTriggerMethod = 24 [default = TRADE];
+}
+
+/** Execution event type ENUM. */
+enum ProtoOAExecutionType {
+    ORDER_ACCEPTED = 2;
+    ORDER_FILLED = 3;
+    ORDER_REPLACED = 4;
+    ORDER_CANCELLED = 5;
+    ORDER_EXPIRED = 6;
+    ORDER_REJECTED = 7;
+    ORDER_CANCEL_REJECTED = 8;
+    SWAP = 9;
+    DEPOSIT_WITHDRAW = 10;
+    ORDER_PARTIAL_FILL = 11;
+    BONUS_DEPOSIT_WITHDRAW = 12;
+}
+
+/** Bonus deposit/withdrawal entity. */
+message ProtoOABonusDepositWithdraw {
+    required ProtoOAChangeBonusType operationType = 1;
+    required int64 bonusHistoryId = 2;
+    required int64 managerBonus = 3;
+    required int64 managerDelta = 4;
+    required int64 ibBonus = 5;
+    required int64 ibDelta = 6;
+    required int64 changeBonusTimestamp = 7;
+    optional string externalNote = 8;
+    optional int64 introducingBrokerId = 9;
+    optional uint32 moneyDigits = 10;
+}
+
+/** Bonus operation type ENUM. */
+enum ProtoOAChangeBonusType {
+    BONUS_DEPOSIT = 0;
+    BONUS_WITHDRAW = 1;
+}
+
+/** Account deposit/withdrawal operation entity. */
+message ProtoOADepositWithdraw {
+    required ProtoOAChangeBalanceType operationType = 1;
+    required int64 balanceHistoryId = 2;
+    required int64 balance = 3;
+    required int64 delta = 4;
+    required int64 changeBalanceTimestamp = 5;
+    optional string externalNote = 6;
+    optional int64 balanceVersion = 7;
+    optional int64 equity = 8;
+    optional uint32 moneyDigits = 9;
+}
+
+/** Balance operation entity. Covers all cash movement operations related to account, trading, IB operations, mirroring, etc. */
+enum ProtoOAChangeBalanceType {
+    BALANCE_DEPOSIT = 0;
+    BALANCE_WITHDRAW = 1;
+    BALANCE_DEPOSIT_STRATEGY_COMMISSION_INNER = 3;
+    BALANCE_WITHDRAW_STRATEGY_COMMISSION_INNER = 4;
+    BALANCE_DEPOSIT_IB_COMMISSIONS = 5;
+    BALANCE_WITHDRAW_IB_SHARED_PERCENTAGE = 6;
+    BALANCE_DEPOSIT_IB_SHARED_PERCENTAGE_FROM_SUB_IB = 7;
+    BALANCE_DEPOSIT_IB_SHARED_PERCENTAGE_FROM_BROKER = 8;
+    BALANCE_DEPOSIT_REBATE = 9;
+    BALANCE_WITHDRAW_REBATE = 10;
+    BALANCE_DEPOSIT_STRATEGY_COMMISSION_OUTER = 11;
+    BALANCE_WITHDRAW_STRATEGY_COMMISSION_OUTER = 12;
+    BALANCE_WITHDRAW_BONUS_COMPENSATION = 13;
+    BALANCE_WITHDRAW_IB_SHARED_PERCENTAGE_TO_BROKER = 14;
+    BALANCE_DEPOSIT_DIVIDENDS = 15;
+    BALANCE_WITHDRAW_DIVIDENDS = 16;
+    BALANCE_WITHDRAW_GSL_CHARGE = 17;
+    BALANCE_WITHDRAW_ROLLOVER = 18;
+    BALANCE_DEPOSIT_NONWITHDRAWABLE_BONUS = 19;
+    BALANCE_WITHDRAW_NONWITHDRAWABLE_BONUS = 20;
+    BALANCE_DEPOSIT_SWAP = 21;
+    BALANCE_WITHDRAW_SWAP = 22;
+    BALANCE_DEPOSIT_MANAGEMENT_FEE = 27;
+    BALANCE_WITHDRAW_MANAGEMENT_FEE = 28;
+    BALANCE_DEPOSIT_PERFORMANCE_FEE = 29;
+    BALANCE_WITHDRAW_FOR_SUBACCOUNT = 30;
+    BALANCE_DEPOSIT_TO_SUBACCOUNT = 31;
+    BALANCE_WITHDRAW_FROM_SUBACCOUNT = 32;
+    BALANCE_DEPOSIT_FROM_SUBACCOUNT = 33;
+    BALANCE_WITHDRAW_COPY_FEE = 34;
+    BALANCE_WITHDRAW_INACTIVITY_FEE = 35;
+    BALANCE_DEPOSIT_TRANSFER = 36;
+    BALANCE_WITHDRAW_TRANSFER = 37;
+    BALANCE_DEPOSIT_CONVERTED_BONUS = 38;
+    BALANCE_DEPOSIT_NEGATIVE_BALANCE_PROTECTION = 39;
+}
+
+/** Execution entity. */
+message ProtoOADeal {
+    required int64 dealId = 1;
+    required int64 orderId = 2;
+    required int64 positionId = 3;
+    required int64 volume = 4;
+    required int64 filledVolume = 5;
+    required int64 symbolId = 6;
+    required int64 createTimestamp = 7;
+    required int64 executionTimestamp = 8;
+    optional int64 utcLastUpdateTimestamp = 9;
+    optional double executionPrice = 10;
+    required ProtoOATradeSide tradeSide = 11;
+    required ProtoOADealStatus dealStatus = 12;
+    optional double marginRate = 13;
+    optional int64 commission = 14;
+    optional double baseToUsdConversionRate = 15;
+    optional ProtoOAClosePositionDetail closePositionDetail = 16;
+    optional uint32 moneyDigits = 17;
+}
+
+/** Deal details for ProtoOADealOffsetListReq. */
+message ProtoOADealOffset {
+    required int64 dealId = 1;
+    required int64 volume = 2;
+    optional int64 executionTimestamp = 3;
+    optional double executionPrice = 4;
+}
+
+/** Deal status ENUM. */
+enum ProtoOADealStatus {
+    FILLED = 2;
+    PARTIALLY_FILLED = 3;
+    REJECTED = 4;
+    INTERNALLY_REJECTED = 5;
+    ERROR = 6;
+    MISSED = 7;
+}
+
+/** Trading details for closing deal. */
+message ProtoOAClosePositionDetail {
+    required double entryPrice = 1;
+    required int64 grossProfit = 2;
+    required int64 swap = 3;
+    required int64 commission = 4;
+    required int64 balance = 5;
+    optional double quoteToDepositConversionRate = 6;
+    optional int64 closedVolume = 7;
+    optional int64 balanceVersion = 8;
+    optional uint32 moneyDigits = 9;
+    optional int64 pnlConversionFee = 10;
+}
+
+/** Trendbar period ENUM. */
+enum ProtoOATrendbarPeriod {
+    M1 = 1;
+    M2 = 2;
+    M3 = 3;
+    M4 = 4;
+    M5 = 5;
+    M10 = 6;
+    M15 = 7;
+    M30 = 8;
+    H1 = 9;
+    H4 = 10;
+    H12 = 11;
+    D1 = 12;
+    W1 = 13;
+    MN1 = 14;
+}
+
+/** Historical Trendbar entity. */
+message ProtoOATrendbar {
+    required int64 volume = 3;
+    optional ProtoOATrendbarPeriod period = 4 [default = M1];
+    optional int64 low = 5;
+    optional uint64 deltaOpen = 6;
+    optional uint64 deltaClose = 7;
+    optional uint64 deltaHigh = 8;
+    optional uint32 utcTimestampInMinutes = 9;
+}
+
+/** Expected margin computation entity. */
+message ProtoOAExpectedMargin {
+    required int64 volume = 1;
+    required int64 buyMargin = 2;
+    required int64 sellMargin = 3;
+}
+
+/** Price quote type. */
+enum ProtoOAQuoteType {
+    BID = 1;
+    ASK = 2;
+}
+
+/** Historical tick data type. */
+message ProtoOATickData {
+    required int64 timestamp = 1;
+    required int64 tick = 2;
+}
+
+/** Open API application permission in regards to token ENUM. */
+enum ProtoOAClientPermissionScope {
+    SCOPE_VIEW = 0;
+    SCOPE_TRADE = 1;
+}
+
+/** Trader profile entity. Empty due to GDPR. */
+message ProtoOACtidProfile {
+    required int64 userId = 1;
+}
+
+/** Trader account entity. */
+message ProtoOACtidTraderAccount {
+    required uint64 ctidTraderAccountId = 1;
+    optional bool isLive = 2;
+    optional int64 traderLogin = 3;
+    optional int64 lastClosingDealTimestamp = 4;
+    optional int64 lastBalanceUpdateTimestamp = 5;
+    optional string brokerTitleShort = 6;
+}
+
+/** Asset class entity. */
+message ProtoOAAssetClass {
+    optional int64 id = 1;
+    optional string name = 2;
+    optional double sortingNumber = 3;
+}
+
+/** Depth of market entity. */
+message ProtoOADepthQuote {
+    required uint64 id = 1;
+    required uint64 size = 3;
+    optional uint64 bid = 4;
+    optional uint64 ask = 5;
+}
+
+/** Margin call entity, specifies threshold for exact margin call type. Only 3 instances of margin calls are supported, identified by marginCallType. See ProtoOANotificationType for details. */
+message ProtoOAMarginCall {
+    required ProtoOANotificationType marginCallType = 1;
+    required double marginLevelThreshold = 2;
+    optional int64 utcLastUpdateTimestamp = 3;
+}
+
+/** Type of notification, currently only 3 instances of marginCall are supported. */
+enum ProtoOANotificationType {
+    MARGIN_LEVEL_THRESHOLD_1 = 61;
+    MARGIN_LEVEL_THRESHOLD_2 = 62;
+    MARGIN_LEVEL_THRESHOLD_3 = 63;
+}
+
+/** Error code ENUM. */
+enum ProtoOAErrorCode {
+    OA_AUTH_TOKEN_EXPIRED = 1;
+    ACCOUNT_NOT_AUTHORIZED = 2;
+    RET_NO_SUCH_LOGIN = 12;
+    ALREADY_LOGGED_IN = 14;
+    RET_ACCOUNT_DISABLED = 64;
+    CH_CLIENT_AUTH_FAILURE = 101;
+    CH_CLIENT_NOT_AUTHENTICATED = 102;
+    CH_CLIENT_ALREADY_AUTHENTICATED = 103;
+    CH_ACCESS_TOKEN_INVALID = 104;
+    CH_SERVER_NOT_REACHABLE = 105;
+    CH_CTID_TRADER_ACCOUNT_NOT_FOUND = 106;
+    CH_OA_CLIENT_NOT_FOUND = 107;
+    REQUEST_FREQUENCY_EXCEEDED = 108;
+    SERVER_IS_UNDER_MAINTENANCE = 109;
+    CHANNEL_IS_BLOCKED = 110;
+    CONNECTIONS_LIMIT_EXCEEDED = 67;
+    WORSE_GSL_NOT_ALLOWED = 68;
+    SYMBOL_HAS_HOLIDAY = 69;
+    NOT_SUBSCRIBED_TO_SPOTS = 112;
+    ALREADY_SUBSCRIBED = 113;
+    SYMBOL_NOT_FOUND = 114;
+    UNKNOWN_SYMBOL = 115;
+    INCORRECT_BOUNDARIES = 35;
+    NO_QUOTES = 117;
+    NOT_ENOUGH_MONEY = 118;
+    MAX_EXPOSURE_REACHED = 119;
+    POSITION_NOT_FOUND = 120;
+    ORDER_NOT_FOUND = 121;
+    POSITION_NOT_OPEN = 122;
+    POSITION_LOCKED = 123;
+    TOO_MANY_POSITIONS = 124;
+    TRADING_BAD_VOLUME = 125;
+    TRADING_BAD_STOPS = 126;
+    TRADING_BAD_PRICES = 127;
+    TRADING_BAD_STAKE = 128;
+    PROTECTION_IS_TOO_CLOSE_TO_MARKET = 129;
+    TRADING_BAD_EXPIRATION_DATE = 130;
+    PENDING_EXECUTION = 131;
+    TRADING_DISABLED = 132;
+    TRADING_NOT_ALLOWED = 133;
+    UNABLE_TO_CANCEL_ORDER = 134;
+    UNABLE_TO_AMEND_ORDER = 135;
+    SHORT_SELLING_NOT_ALLOWED = 136;
+}
+
+enum ProtoOALimitedRiskMarginCalculationStrategy {
+    ACCORDING_TO_LEVERAGE = 0;
+    ACCORDING_TO_GSL = 1;
+    ACCORDING_TO_GSL_AND_LEVERAGE = 2;
+}
+
+message ProtoOAHoliday {
+    required int64 holidayId = 1;
+    required string name = 2;
+    optional string description = 3;
+    required string scheduleTimeZone = 4;
+    required int64 holidayDate = 5;
+    required bool isRecurring = 6;
+    optional int32 startSecond = 7;
+    optional int32 endSecond = 8;
+}
+
+message ProtoOADynamicLeverage {
+    required int64 leverageId = 1;
+    repeated ProtoOADynamicLeverageTier tiers = 2;
+}
+
+message ProtoOADynamicLeverageTier {
+    required int64 volume = 1;
+    required int32 leverage = 2;
+}
+
+message ProtoOAPositionUnrealizedPnL {
+    required int64 positionId = 1;
+    required int64 grossUnrealizedPnL = 2;
+    required int64 netUnrealizedPnL = 3;
+}
+
+enum ProtoOAStopOutStrategy {
+    MOST_MARGIN_USED_FIRST = 0;
+    MOST_LOSING_FIRST = 1;
+}

@@ -1,0 +1,117 @@
+syntax = "proto2";
+
+option go_package = "/openapi";
+
+option java_multiple_files = true;
+
+option java_generate_equals_and_hash = true;
+
+option java_package = "com.xtrader.protocol.openapi.v2";
+
+option java_outer_classname = "ContainerOpenApiV2Messages";
+
+import "OpenApiModelMessages.proto";
+
+/** Request for the authorizing an application to work with the cTrader platform Proxies. */
+message ProtoOAApplicationAuthReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_APPLICATION_AUTH_REQ];
+
+    required string clientId = 2;
+    required string clientSecret = 3;
+}
+
+/** Response to the ProtoOAApplicationAuthReq request. */
+message ProtoOAApplicationAuthRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_APPLICATION_AUTH_RES];
+}
+
+/** Request for authorizing of the trading account session. Requires established authorized connection with the client application using ProtoOAApplicationAuthReq. */
+message ProtoOAAccountAuthReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ACCOUNT_AUTH_REQ];
+
+    required int64 ctidTraderAccountId = 2;
+    required string accessToken = 3;
+}
+
+/** Response to the ProtoOAApplicationAuthRes request. */
+message ProtoOAAccountAuthRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ACCOUNT_AUTH_RES];
+
+    required int64 ctidTraderAccountId = 2;
+}
+
+/** Generic response when an ERROR occurred. */
+message ProtoOAErrorRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ERROR_RES];
+
+    optional int64 ctidTraderAccountId = 2;
+    required string errorCode = 3;
+    optional string description = 4;
+    optional int64 maintenanceEndTimestamp = 5;
+    optional uint64 retryAfter = 6;
+}
+
+/** Request for getting data of Trader's Account. */
+message ProtoOATraderReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_TRADER_REQ];
+
+    required int64 ctidTraderAccountId = 2;
+}
+
+/** Response to the ProtoOATraderReq request. */
+message ProtoOATraderRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_TRADER_RES];
+
+    required int64 ctidTraderAccountId = 2;
+    required ProtoOATrader trader = 3;
+}
+
+/** Request for getting Trader's current open positions and pending orders data. */
+message ProtoOAReconcileReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_RECONCILE_REQ];
+
+    required int64 ctidTraderAccountId = 2;
+    optional bool returnProtectionOrders = 3;
+}
+
+/** The response to the ProtoOAReconcileReq request. */
+message ProtoOAReconcileRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_RECONCILE_RES];
+
+    required int64 ctidTraderAccountId = 2;
+    repeated ProtoOAPosition position = 3;
+    repeated ProtoOAOrder order = 4;
+}
+
+/** Request for a list of symbols available for a trading account. Symbol entries are returned with the limited set of fields. */
+message ProtoOASymbolsListReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_LIST_REQ];
+
+    required int64 ctidTraderAccountId = 2;
+    optional bool includeArchivedSymbols = 3 [default = false];
+}
+
+/** Response to the ProtoOASymbolsListReq request. */
+message ProtoOASymbolsListRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_LIST_RES];
+
+    required int64 ctidTraderAccountId = 2;
+    repeated ProtoOALightSymbol symbol = 3;
+    repeated ProtoOAArchivedSymbol archivedSymbol = 4;
+}
+
+/** Request for the list of granted trader's account for the access token. */
+message ProtoOAGetAccountListByAccessTokenReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ];
+
+    required string accessToken = 2;
+}
+
+/** Response to the ProtoOAGetAccountListByAccessTokenReq request. */
+message ProtoOAGetAccountListByAccessTokenRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES];
+
+    required string accessToken = 2;
+    optional ProtoOAClientPermissionScope permissionScope = 3;
+    repeated ProtoOACtidTraderAccount ctidTraderAccount = 4;
+}

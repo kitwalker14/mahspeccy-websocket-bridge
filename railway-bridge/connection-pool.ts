@@ -12,6 +12,7 @@
  */
 
 import { CTraderClient, type CTraderCredentials } from './ctrader-client.ts';
+import { protoLoader } from './proto-loader.ts';
 
 interface PooledConnection {
   client: CTraderClient;
@@ -24,10 +25,22 @@ export class ConnectionPool {
   private connections = new Map<string, PooledConnection>();
   private maxIdleTime = 5 * 60 * 1000; // 5 minutes
   private cleanupInterval: number | null = null;
+  private protoInitialized = false;
 
   constructor() {
     // Start cleanup task
     this.startCleanup();
+  }
+
+  /**
+   * Initialize Protocol Buffers (call once on startup)
+   */
+  async initialize(): Promise<void> {
+    if (!this.protoInitialized) {
+      await protoLoader.load();
+      this.protoInitialized = true;
+      console.log('[ConnectionPool] ✅ Protocol Buffers initialized');
+    }
   }
 
   /**

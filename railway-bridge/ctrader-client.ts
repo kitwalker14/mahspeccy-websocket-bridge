@@ -8,8 +8,6 @@
  * - Message request/response correlation
  */
 
-import protobuf from 'protobufjs';
-import Long from 'long';
 import { 
   ProtoOAPayloadType,
   type ApplicationAuthReq,
@@ -19,17 +17,7 @@ import {
   type SymbolsListReq,
   type ReconcileReq,
 } from './proto-messages.ts';
-
-// Protocol Buffers schema for cTrader ProtoMessage wrapper
-const protoMessageSchema = `
-syntax = "proto2";
-
-message ProtoMessage {
-    optional uint32 payloadType = 1;
-    optional bytes payload = 2;
-    optional string clientMsgId = 3;
-}
-`;
+import { protoLoader } from './proto-loader.ts';
 
 export interface CTraderCredentials {
   clientId: string;
@@ -51,16 +39,19 @@ export class CTraderClient {
     reject: (error: Error) => void;
     timeout: number;
   }>();
-  private ProtoMessageType: any;
   private heartbeatInterval: number | null = null;
 
   constructor(isDemo: boolean) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
     this.port = 5035;
-    
-    // Initialize Protocol Buffers
-    const root = protobuf.parse(protoMessageSchema).root;
-    this.ProtoMessageType = root.lookupType('ProtoMessage');
+  }
+
+  /**
+   * Initialize Protocol Buffers
+   */
+  async initialize(): Promise<void> {
+    await protoLoader.load();
+    console.log('[CTraderClient] ✅ Protocol Buffers initialized');
   }
 
   /**
@@ -155,16 +146,15 @@ export class CTraderClient {
    */
   private handleMessage(data: ArrayBuffer): void {
     try {
-      // Decode ProtoMessage wrapper
+      // Decode ProtoMessage wrapper using protoLoader
       const buffer = new Uint8Array(data);
-      const message = this.ProtoMessageType.decode(buffer);
-      const payloadType = message.payloadType;
-      const clientMsgId = message.clientMsgId;
+      const decoded = protoLoader.decodeMessage(buffer);
+      const { payloadType, payload, clientMsgId } = decoded;
       
       console.log(`[CTraderClient] ← Received: ${this.getMessageTypeName(payloadType)} (msgId: ${clientMsgId})`);
       
       // Handle heartbeat
-      if (payloadType === ProtoOAPayloadType.HEARTBEAT_EVENT) {
+      if (payloadType === 51) { // HEARTBEAT_EVENT
         return; // Ignore heartbeat responses
       }
       
@@ -173,9 +163,6 @@ export class CTraderClient {
         const request = this.pendingRequests.get(clientMsgId)!;
         clearTimeout(request.timeout);
         this.pendingRequests.delete(clientMsgId);
-        
-        // Decode payload based on message type
-        const payload = this.decodePayload(payloadType, message.payload);
         
         // Check for errors
         if (payloadType === ProtoOAPayloadType.PROTO_OA_ERROR_RES) {
@@ -220,47 +207,7 @@ export class CTraderClient {
    * Encode message with Protocol Buffers
    */
   private encodeMessage(payloadType: number, payload: any, clientMsgId?: string): Uint8Array {
-    // Encode payload (simplified - in production, use proper protobuf schemas for each message type)
-    const payloadBytes = this.encodePayload(payloadType, payload);
-    
-    // Encode ProtoMessage wrapper
-    const message = {
-      payloadType,
-      payload: payloadBytes,
-      clientMsgId,
-    };
-    
-    const errMsg = this.ProtoMessageType.verify(message);
-    if (errMsg) {
-      throw new Error('Invalid ProtoMessage: ' + errMsg);
-    }
-    
-    const protoMessage = this.ProtoMessageType.create(message);
-    return this.ProtoMessageType.encode(protoMessage).finish();
-  }
-
-  /**
-   * Encode payload (simplified JSON encoding - in production, use proper protobuf schemas)
-   */
-  private encodePayload(payloadType: number, payload: any): Uint8Array {
-    // For simplicity, we're using JSON encoding
-    // In production, use proper Protocol Buffers schemas for each message type
-    const json = JSON.stringify(payload);
-    return new TextEncoder().encode(json);
-  }
-
-  /**
-   * Decode payload (simplified JSON decoding - in production, use proper protobuf schemas)
-   */
-  private decodePayload(payloadType: number, payloadBytes: Uint8Array): any {
-    // For simplicity, we're using JSON decoding
-    // In production, use proper Protocol Buffers schemas for each message type
-    try {
-      const json = new TextDecoder().decode(payloadBytes);
-      return JSON.parse(json);
-    } catch {
-      return {};
-    }
+    return protoLoader.encodeMessage(payloadType, payload, clientMsgId);
   }
 
   /**
