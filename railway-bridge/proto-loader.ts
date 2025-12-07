@@ -24,13 +24,19 @@ export class ProtoLoader {
       // Create root
       this.root = new protobuf.Root();
       
-      // Load proto files in correct order (dependencies first)
-      await this.root.load([
-        `${PROTO_DIR}OpenApiCommonModelMessages.proto`,
-        `${PROTO_DIR}OpenApiCommonMessages.proto`,
-        `${PROTO_DIR}OpenApiModelMessages.proto`,
-        `${PROTO_DIR}OpenApiMessages.proto`,
-      ], { keepCase: true });
+      // Read and parse proto files (Deno-compatible way)
+      const protoFiles = [
+        'OpenApiCommonModelMessages.proto',
+        'OpenApiCommonMessages.proto',
+        'OpenApiModelMessages.proto',
+        'OpenApiMessages.proto',
+      ];
+      
+      for (const filename of protoFiles) {
+        const filepath = `${PROTO_DIR}${filename}`;
+        const content = await Deno.readTextFile(filepath);
+        protobuf.parse(content, this.root, { keepCase: true });
+      }
       
       // Get ProtoMessage type (wrapper for all messages)
       this.ProtoMessageType = this.root.lookupType('ProtoMessage');
