@@ -71,6 +71,11 @@ export class ConnectionPool {
     const client = new CTraderClient(credentials.isDemo);
     
     try {
+      // CRITICAL: Initialize proto files for this client instance
+      console.log(`[ConnectionPool] 📦 Initializing proto files for client...`);
+      await client.initialize();
+      console.log(`[ConnectionPool] ✅ Proto files initialized for client`);
+      
       // Connect and authenticate
       await client.connect();
       

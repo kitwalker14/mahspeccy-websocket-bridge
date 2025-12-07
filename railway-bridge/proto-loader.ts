@@ -13,81 +13,101 @@ const PROTO_DIR = new URL('./proto/', import.meta.url).pathname;
 export class ProtoLoader {
   private root: protobuf.Root | null = null;
   private protoMessages: Record<string, protobuf.Type> = {};
+  private loading: Promise<void> | null = null; // Track loading state
   
   /**
-   * Load all proto files
+   * Load all proto files (idempotent - can be called multiple times safely)
    */
   async load(): Promise<void> {
+    // If already loaded, return immediately
+    if (this.root !== null) {
+      console.log('[ProtoLoader] Proto files already loaded, skipping');
+      return;
+    }
+    
+    // If currently loading, wait for it to finish
+    if (this.loading !== null) {
+      console.log('[ProtoLoader] Proto files currently loading, waiting...');
+      return this.loading;
+    }
+    
+    // Start loading
     console.log('[ProtoLoader] Loading Protocol Buffer schemas...');
     
-    try {
-      // Create root
-      this.root = new protobuf.Root();
-      
-      // Read and parse proto files (Deno-compatible way)
-      const protoFiles = [
-        'OpenApiCommonModelMessages.proto',
-        'OpenApiCommonMessages.proto',
-        'OpenApiModelMessages.proto',
-        'OpenApiMessages.proto',
-      ];
-      
-      for (const filename of protoFiles) {
-        const filepath = `${PROTO_DIR}${filename}`;
-        const content = await Deno.readTextFile(filepath);
-        protobuf.parse(content, this.root, { keepCase: true });
-      }
-      
-      // Get ProtoMessage type (wrapper for all messages)
-      const ProtoMessageType = this.root.lookupType('ProtoMessage');
-      
-      console.log('[ProtoLoader] ✅ Protocol Buffers loaded successfully');
-      
-      // Populate protoMessages map
-      const typeMap: Record<number, string> = {
-        // Application Auth
-        [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_REQ]: 'ProtoOAApplicationAuthReq',
-        [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES]: 'ProtoOAApplicationAuthRes',
+    this.loading = (async () => {
+      try {
+        // Create root
+        this.root = new protobuf.Root();
         
-        // Account Auth
-        [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ]: 'ProtoOAAccountAuthReq',
-        [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES]: 'ProtoOAAccountAuthRes',
+        // Read and parse proto files (Deno-compatible way)
+        const protoFiles = [
+          'OpenApiCommonModelMessages.proto',
+          'OpenApiCommonMessages.proto',
+          'OpenApiModelMessages.proto',
+          'OpenApiMessages.proto',
+        ];
         
-        // Trader (Account Info)
-        [ProtoOAPayloadType.PROTO_OA_TRADER_REQ]: 'ProtoOATraderReq',
-        [ProtoOAPayloadType.PROTO_OA_TRADER_RES]: 'ProtoOATraderRes',
-        
-        // Reconcile (Positions)
-        [ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ]: 'ProtoOAReconcileReq',
-        [ProtoOAPayloadType.PROTO_OA_RECONCILE_RES]: 'ProtoOAReconcileRes',
-        
-        // Symbols
-        [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ]: 'ProtoOASymbolsListReq',
-        [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES]: 'ProtoOASymbolsListRes',
-        
-        // Accounts by token
-        [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
-        [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES]: 'ProtoOAGetAccountListByAccessTokenRes',
-        
-        // Error
-        [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
-        
-        // Heartbeat (common)
-        [51]: 'ProtoHeartbeatEvent',
-      };
-      
-      for (const [payloadType, messageTypeName] of Object.entries(typeMap)) {
-        const MessageType = this.root.lookupType(messageTypeName);
-        if (MessageType) {
-          this.protoMessages[messageTypeName] = MessageType;
-        } else {
-          console.warn(`[ProtoLoader] Message type not found: ${messageTypeName}`);
+        for (const filename of protoFiles) {
+          const filepath = `${PROTO_DIR}${filename}`;
+          const content = await Deno.readTextFile(filepath);
+          protobuf.parse(content, this.root, { keepCase: true });
         }
+        
+        // Get ProtoMessage type (wrapper for all messages)
+        const ProtoMessageType = this.root.lookupType('ProtoMessage');
+        
+        console.log('[ProtoLoader] ✅ Protocol Buffers loaded successfully');
+        
+        // Populate protoMessages map
+        const typeMap: Record<number, string> = {
+          // Application Auth
+          [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_REQ]: 'ProtoOAApplicationAuthReq',
+          [ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES]: 'ProtoOAApplicationAuthRes',
+          
+          // Account Auth
+          [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ]: 'ProtoOAAccountAuthReq',
+          [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES]: 'ProtoOAAccountAuthRes',
+          
+          // Trader (Account Info)
+          [ProtoOAPayloadType.PROTO_OA_TRADER_REQ]: 'ProtoOATraderReq',
+          [ProtoOAPayloadType.PROTO_OA_TRADER_RES]: 'ProtoOATraderRes',
+          
+          // Reconcile (Positions)
+          [ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ]: 'ProtoOAReconcileReq',
+          [ProtoOAPayloadType.PROTO_OA_RECONCILE_RES]: 'ProtoOAReconcileRes',
+          
+          // Symbols
+          [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ]: 'ProtoOASymbolsListReq',
+          [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES]: 'ProtoOASymbolsListRes',
+          
+          // Accounts by token
+          [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
+          [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES]: 'ProtoOAGetAccountListByAccessTokenRes',
+          
+          // Error
+          [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
+          
+          // Heartbeat (common)
+          [51]: 'ProtoHeartbeatEvent',
+        };
+        
+        for (const [payloadType, messageTypeName] of Object.entries(typeMap)) {
+          const MessageType = this.root.lookupType(messageTypeName);
+          if (MessageType) {
+            this.protoMessages[messageTypeName] = MessageType;
+          } else {
+            console.warn(`[ProtoLoader] Message type not found: ${messageTypeName}`);
+          }
+        }
+      } catch (error) {
+        console.error('[ProtoLoader] ❌ Failed to load proto files:', error);
+        throw error;
+      } finally {
+        this.loading = null; // Reset loading state
       }
-    } catch (error) {
-      console.error('[ProtoLoader] ❌ Failed to load proto files:', error);
-      throw error;
-    }
+    })();
+    
+    return this.loading;
   }
   
   /**
@@ -150,12 +170,15 @@ export class ProtoLoader {
    * Decode a ProtoMessage
    */
   decodeMessage(buffer: Uint8Array): { payloadType: number; payload: any; clientMsgId?: string } {
-    if (!this.root || !this.ProtoMessageType) {
+    if (!this.root) {
       throw new Error('Proto files not loaded. Call load() first.');
     }
     
+    // Get ProtoMessage type
+    const ProtoMessageType = this.root.lookupType('ProtoMessage');
+    
     // Decode ProtoMessage wrapper
-    const protoMessage = this.ProtoMessageType.decode(buffer) as any;
+    const protoMessage = ProtoMessageType.decode(buffer) as any;
     const payloadType = protoMessage.payloadType;
     const payloadBytes = protoMessage.payload;
     const clientMsgId = protoMessage.clientMsgId;
