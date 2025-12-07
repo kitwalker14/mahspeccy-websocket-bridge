@@ -55,45 +55,61 @@ export class CTraderClient {
   }
 
   /**
-   * Connect to cTrader WebSocket
+   * Connect to cTrader WebSocket server
    */
   async connect(): Promise<void> {
+    const url = `wss://${this.host}:${this.port}`;
+    console.log(`[CTraderClient] 🔌 Connecting to ${url}...`);
+    console.log(`[CTraderClient] Environment: ${this.host.includes('demo') ? 'DEMO' : 'LIVE'}`);
+    
     return new Promise((resolve, reject) => {
-      const url = `wss://${this.host}:${this.port}/`;
-      console.log(`[CTraderClient] Connecting to ${url}...`);
-      
       const timeout = setTimeout(() => {
-        reject(new Error('Connection timeout (10s)'));
-      }, 10000);
+        console.error(`[CTraderClient] ❌ Connection timeout after 10s`);
+        this.disconnect();
+        reject(new Error('WebSocket connection timeout'));
+      }, 10000); // 10s timeout
 
-      this.ws = new WebSocket(url);
-      
-      this.ws.binaryType = 'arraybuffer';
-      
-      this.ws.onopen = () => {
+      try {
+        console.log(`[CTraderClient] Creating WebSocket...`);
+        this.ws = new WebSocket(url);
+        console.log(`[CTraderClient] WebSocket created, state: ${this.ws.readyState}`);
+
+        this.ws.binaryType = 'arraybuffer';
+        console.log(`[CTraderClient] Binary type set to: ${this.ws.binaryType}`);
+
+        this.ws.onopen = () => {
+          clearTimeout(timeout);
+          console.log(`[CTraderClient] ✅ WebSocket connected!`);
+          console.log(`[CTraderClient] ReadyState: ${this.ws?.readyState} (OPEN=1)`);
+          this.startHeartbeat();
+          resolve();
+        };
+
+        this.ws.onerror = (error: Event) => {
+          clearTimeout(timeout);
+          console.error(`[CTraderClient] ❌ WebSocket error:`, error);
+          console.error(`[CTraderClient] Error type:`, error.type);
+          console.error(`[CTraderClient] ReadyState: ${this.ws?.readyState}`);
+          reject(new Error(`WebSocket error: ${error.type}`));
+        };
+
+        this.ws.onclose = (event: CloseEvent) => {
+          console.log(`[CTraderClient] 🔌 WebSocket closed`);
+          console.log(`[CTraderClient] Code: ${event.code}, Reason: ${event.reason || 'No reason provided'}`);
+          console.log(`[CTraderClient] Was clean: ${event.wasClean}`);
+          this.stopHeartbeat();
+          this.appAuthenticated = false;
+          this.accountAuthenticated = false;
+        };
+
+        this.ws.onmessage = (event: MessageEvent) => {
+          this.handleMessage(event.data);
+        };
+      } catch (error) {
         clearTimeout(timeout);
-        console.log('[CTraderClient] ✅ Connected');
-        
-        // Start heartbeat
-        this.startHeartbeat();
-        
-        resolve();
-      };
-      
-      this.ws.onmessage = (event) => {
-        this.handleMessage(event.data);
-      };
-      
-      this.ws.onerror = (error) => {
-        console.error('[CTraderClient] ❌ WebSocket error:', error);
-        clearTimeout(timeout);
-        reject(new Error('WebSocket connection error'));
-      };
-      
-      this.ws.onclose = () => {
-        console.log('[CTraderClient] Connection closed');
-        this.cleanup();
-      };
+        console.error(`[CTraderClient] ❌ Failed to create WebSocket:`, error);
+        reject(error);
+      }
     });
   }
 
@@ -139,6 +155,16 @@ export class CTraderClient {
         this.ws.send(heartbeat);
       }
     }, 25000); // Every 25 seconds
+  }
+
+  /**
+   * Stop heartbeat
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
   }
 
   /**
