@@ -175,14 +175,26 @@ export class CTraderClient {
     try {
       // Decode ProtoMessage wrapper using protoLoader
       const buffer = new Uint8Array(data);
+      
+      console.log(`[CTraderClient] 📥 Raw message received (${buffer.length} bytes)`);
+      console.log(`[CTraderClient] 🔍 First 20 bytes (hex):`, Array.from(buffer.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      
       const decoded = protoLoader.decodeMessage(buffer);
       const { payloadType, payload, clientMsgId } = decoded;
       
       console.log(`[CTraderClient] ← Received: ${this.getMessageTypeName(payloadType)} (msgId: ${clientMsgId})`);
+      console.log(`[CTraderClient] 📦 Payload keys:`, Object.keys(payload || {}));
       
       // Handle heartbeat
       if (payloadType === 51) { // HEARTBEAT_EVENT
         return; // Ignore heartbeat responses
+      }
+      
+      // Check for error responses
+      if (payloadType === ProtoOAPayloadType.PROTO_OA_ERROR_RES) {
+        console.error('[CTraderClient] ❌ ERROR RESPONSE:', payload);
+        console.error('[CTraderClient] Error code:', payload.errorCode);
+        console.error('[CTraderClient] Description:', payload.description);
       }
       
       // Find pending request
@@ -191,15 +203,21 @@ export class CTraderClient {
         clearTimeout(request.timeout);
         this.pendingRequests.delete(clientMsgId);
         
+        console.log(`[CTraderClient] ✅ Matched pending request: ${clientMsgId}`);
+        
         // Check for errors
         if (payloadType === ProtoOAPayloadType.PROTO_OA_ERROR_RES) {
           request.reject(new Error(`cTrader Error: ${payload.errorCode} - ${payload.description}`));
         } else {
           request.resolve(payload);
         }
+      } else {
+        console.warn(`[CTraderClient] ⚠️ No pending request for msgId: ${clientMsgId}`);
+        console.warn(`[CTraderClient] 📋 Pending requests:`, Array.from(this.pendingRequests.keys()));
       }
     } catch (error) {
       console.error('[CTraderClient] Failed to handle message:', error);
+      console.error('[CTraderClient] Error stack:', error.stack);
       
       // If decode fails for a critical message, this connection may be stale/invalid
       // The connectionPool will handle cleanup when the request times out
