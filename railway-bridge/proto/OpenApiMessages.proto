@@ -88,8 +88,7 @@ message ProtoOASymbolsListReq {
     optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_LIST_REQ];
 
     required int64 ctidTraderAccountId = 2;
-    optional string accessToken = 3; // REQUIRED by some cTrader API versions
-    optional bool includeArchivedSymbols = 4 [default = false];
+    optional bool includeArchivedSymbols = 3 [default = false];
 }
 
 /** Response to the ProtoOASymbolsListReq request. */

@@ -96,7 +96,6 @@ export interface TraderRes {
 
 export interface SymbolsListReq {
   ctidTraderAccountId: number;
-  accessToken: string; // ✅ REQUIRED by cTrader API
   includeArchivedSymbols?: boolean;
 }
 

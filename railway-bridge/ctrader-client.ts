@@ -381,7 +381,8 @@ export class CTraderClient {
     
     const request: SymbolsListReq = {
       ctidTraderAccountId: parseInt(accountId),
-      accessToken: this.accessToken, // REQUIRED by cTrader API
+      // NOTE: accessToken is NOT included in SymbolsListReq per official cTrader proto schema
+      // The session is already authenticated via AccountAuthReq
     };
     
     console.log('[CTraderClient] 📋 Request:', JSON.stringify(request, null, 2));
