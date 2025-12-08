@@ -178,7 +178,8 @@ export class CTraderClient {
       const decoded = protoLoader.decodeMessage(buffer);
       const { payloadType, payload, clientMsgId } = decoded;
       
-      console.log(`[CTraderClient] ← Received: ${this.getMessageTypeName(payloadType)} (msgId: ${clientMsgId})`);\n      
+      console.log(`[CTraderClient] ← Received: ${this.getMessageTypeName(payloadType)} (msgId: ${clientMsgId})`);
+      
       // Handle heartbeat
       if (payloadType === 51) { // HEARTBEAT_EVENT
         return; // Ignore heartbeat responses
