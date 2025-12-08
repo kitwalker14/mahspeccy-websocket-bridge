@@ -193,6 +193,14 @@ export class ProtoLoader {
       payload = PayloadMessageType.decode(payloadBytes);
     } catch (error) {
       console.warn(`[ProtoLoader] Could not decode payload for type ${payloadType} (${messageTypeName}):`, error);
+      console.warn(`[ProtoLoader] Raw payload bytes (length=${payloadBytes.length}):`, Array.from(payloadBytes.slice(0, 20)));
+      console.warn(`[ProtoLoader] Full message hex:`, Buffer.from(buffer).toString('hex').substring(0, 200));
+      
+      // If this is a critical response type, throw error instead of returning empty payload
+      const criticalTypes = [2105, 2102, 2104]; // TRADER_RES, ACCOUNT_AUTH_RES, ERROR_RES
+      if (criticalTypes.includes(payloadType)) {
+        throw new Error(`Failed to decode critical message type ${payloadType} (${messageTypeName}): ${error}`);
+      }
     }
     
     return {

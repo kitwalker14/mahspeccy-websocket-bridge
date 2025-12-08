@@ -178,8 +178,7 @@ export class CTraderClient {
       const decoded = protoLoader.decodeMessage(buffer);
       const { payloadType, payload, clientMsgId } = decoded;
       
-      console.log(`[CTraderClient] ← Received: ${this.getMessageTypeName(payloadType)} (msgId: ${clientMsgId})`);
-      
+      console.log(`[CTraderClient] ← Received: ${this.getMessageTypeName(payloadType)} (msgId: ${clientMsgId})`);\n      
       // Handle heartbeat
       if (payloadType === 51) { // HEARTBEAT_EVENT
         return; // Ignore heartbeat responses
@@ -200,6 +199,9 @@ export class CTraderClient {
       }
     } catch (error) {
       console.error('[CTraderClient] Failed to handle message:', error);
+      
+      // If decode fails for a critical message, this connection may be stale/invalid
+      // The connectionPool will handle cleanup when the request times out
     }
   }
 
@@ -276,7 +278,11 @@ export class CTraderClient {
       throw new Error('Application not authenticated');
     }
     
+    // Store accessToken even if already authenticated (for reused connections)
+    this.accessToken = accessToken;
+    
     if (this.accountAuthenticated) {
+      console.log('[CTraderClient] ⚡ Account already authenticated, accessToken refreshed');
       return; // Already authenticated
     }
 
@@ -293,7 +299,6 @@ export class CTraderClient {
     );
     
     this.accountAuthenticated = true;
-    this.accessToken = accessToken; // Store accessToken for later use
     console.log('[CTraderClient] ✅ Account authenticated');
   }
 

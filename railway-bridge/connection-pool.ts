@@ -117,6 +117,21 @@ export class ConnectionPool {
   }
 
   /**
+   * Invalidate and remove connection from pool
+   * Used when authentication fails or connection becomes stale
+   */
+  invalidateConnection(credentials: CTraderCredentials): void {
+    const key = this.getKey(credentials);
+    const connection = this.connections.get(key);
+    
+    if (connection) {
+      console.log(`[ConnectionPool] ❌ Invalidating connection: ${key}`);
+      connection.client.disconnect();
+      this.connections.delete(key);
+    }
+  }
+
+  /**
    * Execute request with automatic connection management
    */
   async withConnection<T>(
