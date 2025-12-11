@@ -344,6 +344,330 @@ app.post('/api/accounts', async (c) => {
   }
 });
 
+/**
+ * POST /api/candles
+ * Fetch historical candles (OHLCV data) via cTrader WebSocket
+ */
+app.post('/api/candles', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbol, timeframe, fromTimestamp, toTimestamp, count } = body;
+    
+    if (!symbol || !timeframe) {
+      return c.json({ error: 'symbol and timeframe are required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Candles] Fetching candles for ${symbol} ${timeframe} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Use connection pool to execute request
+    const candlesData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getTrendbars({
+        accountId: credentials.accountId,
+        symbol,
+        period: timeframe,
+        fromTimestamp,
+        toTimestamp,
+        count: count || 100,
+      });
+    });
+
+    console.log(`[Candles] ✅ Success - ${candlesData.trendbar?.length || 0} candles`);
+
+    return c.json({
+      success: true,
+      data: {
+        candles: candlesData.trendbar || [],
+        symbol,
+        timeframe,
+        accountId: credentials.accountId,
+        isDemo: credentials.isDemo,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('[Candles] Error:', error);
+    return c.json(handleError(error, 'api/candles'), 500);
+  }
+});
+
+/**
+ * POST /api/quote
+ * Get real-time quote for a symbol
+ */
+app.post('/api/quote', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbol } = body;
+    
+    if (!symbol) {
+      return c.json({ error: 'symbol is required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Quote] Fetching quote for ${symbol} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Subscribe to spot event and get latest price
+    const quoteData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.subscribeToSpotEvent(credentials.accountId, symbol);
+    });
+
+    console.log(`[Quote] ✅ Success for ${symbol}`);
+
+    return c.json({
+      success: true,
+      data: {
+        symbol,
+        bid: quoteData.bid || 0,
+        ask: quoteData.ask || 0,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('[Quote] Error:', error);
+    return c.json(handleError(error, 'api/quote'), 500);
+  }
+});
+
+/**
+ * POST /api/trade/market
+ * Place a market order
+ */
+app.post('/api/trade/market', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbol, volume, side, stopLoss, takeProfit } = body;
+    
+    if (!symbol || !volume || !side) {
+      return c.json({ error: 'symbol, volume, and side are required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Trade] Placing market ${side} order: ${symbol} ${volume} lots (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Use connection pool to execute request
+    const orderData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.placeMarketOrder({
+        accountId: credentials.accountId,
+        symbol,
+        volume: volume * 100, // Convert to centiLots
+        tradeSide: side === 'BUY' ? 'BUY' : 'SELL',
+        stopLoss,
+        takeProfit,
+      });
+    });
+
+    console.log(`[Trade] ✅ Market order placed successfully`);
+
+    return c.json({
+      success: true,
+      data: orderData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Trade] Market order error:', error);
+    return c.json(handleError(error, 'api/trade/market'), 500);
+  }
+});
+
+/**
+ * POST /api/trade/limit
+ * Place a limit order
+ */
+app.post('/api/trade/limit', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbol, volume, side, price, stopLoss, takeProfit } = body;
+    
+    if (!symbol || !volume || !side || !price) {
+      return c.json({ error: 'symbol, volume, side, and price are required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Trade] Placing limit ${side} order: ${symbol} ${volume} lots @ ${price} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    const orderData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.placeLimitOrder({
+        accountId: credentials.accountId,
+        symbol,
+        volume: volume * 100, // Convert to centiLots
+        tradeSide: side === 'BUY' ? 'BUY' : 'SELL',
+        limitPrice: price,
+        stopLoss,
+        takeProfit,
+      });
+    });
+
+    console.log(`[Trade] ✅ Limit order placed successfully`);
+
+    return c.json({
+      success: true,
+      data: orderData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Trade] Limit order error:', error);
+    return c.json(handleError(error, 'api/trade/limit'), 500);
+  }
+});
+
+/**
+ * POST /api/trade/stop
+ * Place a stop order
+ */
+app.post('/api/trade/stop', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbol, volume, side, price, stopLoss, takeProfit } = body;
+    
+    if (!symbol || !volume || !side || !price) {
+      return c.json({ error: 'symbol, volume, side, and price are required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Trade] Placing stop ${side} order: ${symbol} ${volume} lots @ ${price} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    const orderData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.placeStopOrder({
+        accountId: credentials.accountId,
+        symbol,
+        volume: volume * 100, // Convert to centiLots
+        tradeSide: side === 'BUY' ? 'BUY' : 'SELL',
+        stopPrice: price,
+        stopLoss,
+        takeProfit,
+      });
+    });
+
+    console.log(`[Trade] ✅ Stop order placed successfully`);
+
+    return c.json({
+      success: true,
+      data: orderData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Trade] Stop order error:', error);
+    return c.json(handleError(error, 'api/trade/stop'), 500);
+  }
+});
+
+/**
+ * POST /api/trade/modify
+ * Modify an existing position (update stop loss / take profit)
+ */
+app.post('/api/trade/modify', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { positionId, stopLoss, takeProfit } = body;
+    
+    if (!positionId) {
+      return c.json({ error: 'positionId is required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Trade] Modifying position ${positionId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    const modifyData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.modifyPosition({
+        accountId: credentials.accountId,
+        positionId,
+        stopLoss,
+        takeProfit,
+      });
+    });
+
+    console.log(`[Trade] ✅ Position modified successfully`);
+
+    return c.json({
+      success: true,
+      data: modifyData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Trade] Modify position error:', error);
+    return c.json(handleError(error, 'api/trade/modify'), 500);
+  }
+});
+
+/**
+ * POST /api/trade/close
+ * Close a position
+ */
+app.post('/api/trade/close', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { positionId } = body;
+    
+    if (!positionId) {
+      return c.json({ error: 'positionId is required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Trade] Closing position ${positionId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    const closeData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.closePosition({
+        accountId: credentials.accountId,
+        positionId,
+      });
+    });
+
+    console.log(`[Trade] ✅ Position closed successfully`);
+
+    return c.json({
+      success: true,
+      data: closeData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Trade] Close position error:', error);
+    return c.json(handleError(error, 'api/trade/close'), 500);
+  }
+});
+
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
@@ -359,6 +683,13 @@ app.notFound((c) => {
       'POST /api/positions',
       'POST /api/symbols',
       'POST /api/accounts',
+      'POST /api/candles',
+      'POST /api/quote',
+      'POST /api/trade/market',
+      'POST /api/trade/limit',
+      'POST /api/trade/stop',
+      'POST /api/trade/modify',
+      'POST /api/trade/close',
     ],
   }, 404);
 });
@@ -403,14 +734,24 @@ console.log('  ✅ cTrader ProtoOA Protocol Buffers');
 console.log('  ✅ WebSocket Connection Pooling');
 console.log('  ✅ Automatic Reconnection');
 console.log('  ✅ Full Authentication Flow');
+console.log('  ✅ Trade Execution (Market, Limit, Stop)');
+console.log('  ✅ Position Management (Modify, Close)');
+console.log('  ✅ Historical Data & Real-time Quotes');
 console.log('');
 console.log('Endpoints:');
-console.log('  GET  /health          - Health check');
-console.log('  GET  /stats           - Connection pool stats');
-console.log('  POST /api/account     - Fetch account data');
-console.log('  POST /api/positions   - Fetch positions');
-console.log('  POST /api/symbols     - Fetch symbols');
-console.log('  POST /api/accounts    - List accounts');
+console.log('  GET  /health               - Health check');
+console.log('  GET  /stats                - Connection pool stats');
+console.log('  POST /api/account          - Fetch account data');
+console.log('  POST /api/positions        - Fetch positions');
+console.log('  POST /api/symbols          - Fetch symbols');
+console.log('  POST /api/accounts         - List accounts');
+console.log('  POST /api/candles          - Fetch historical candles');
+console.log('  POST /api/quote            - Get real-time quote');
+console.log('  POST /api/trade/market     - Place market order');
+console.log('  POST /api/trade/limit      - Place limit order');
+console.log('  POST /api/trade/stop       - Place stop order');
+console.log('  POST /api/trade/modify     - Modify position');
+console.log('  POST /api/trade/close      - Close position');
 console.log('');
 console.log(`🌐 Server starting on port ${PORT}...`);
 console.log('='.repeat(60));
