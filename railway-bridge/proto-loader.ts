@@ -68,17 +68,17 @@ export class ProtoLoader {
           [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ]: 'ProtoOAAccountAuthReq',
           [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES]: 'ProtoOAAccountAuthRes',
           
-          // Trader (Account Info)
-          [ProtoOAPayloadType.PROTO_OA_TRADER_REQ]: 'ProtoOATraderReq',
-          [ProtoOAPayloadType.PROTO_OA_TRADER_RES]: 'ProtoOATraderRes',
+          // Trader (Account Info) - FIXED: Now using correct IDs 2121/2122
+          [2121]: 'ProtoOATraderReq',
+          [2122]: 'ProtoOATraderRes',
           
           // Reconcile (Positions)
           [ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ]: 'ProtoOAReconcileReq',
           [ProtoOAPayloadType.PROTO_OA_RECONCILE_RES]: 'ProtoOAReconcileRes',
           
-          // Symbols
-          [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ]: 'ProtoOASymbolsListReq',
-          [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES]: 'ProtoOASymbolsListRes',
+          // Symbols - FIXED: Now using correct IDs 2114/2115
+          [2114]: 'ProtoOASymbolsListReq',
+          [2115]: 'ProtoOASymbolsListRes',
           
           // Accounts by token
           [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
@@ -197,7 +197,7 @@ export class ProtoLoader {
       console.warn(`[ProtoLoader] Full message hex:`, Buffer.from(buffer).toString('hex').substring(0, 200));
       
       // If this is a critical response type, throw error instead of returning empty payload
-      const criticalTypes = [2105, 2102, 2104]; // TRADER_RES, ACCOUNT_AUTH_RES, ERROR_RES
+      const criticalTypes = [2122, 2103, 2142]; // TRADER_RES (FIXED: was 2105), ACCOUNT_AUTH_RES, ERROR_RES (FIXED: was 2104)
       if (criticalTypes.includes(payloadType)) {
         throw new Error(`Failed to decode critical message type ${payloadType} (${messageTypeName}): ${error}`);
       }
@@ -224,17 +224,17 @@ export class ProtoLoader {
       [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ]: 'ProtoOAAccountAuthReq',
       [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES]: 'ProtoOAAccountAuthRes',
       
-      // Trader (Account Info)
-      [ProtoOAPayloadType.PROTO_OA_TRADER_REQ]: 'ProtoOATraderReq',
-      [ProtoOAPayloadType.PROTO_OA_TRADER_RES]: 'ProtoOATraderRes',
+      // Trader (Account Info) - FIXED: Now using correct IDs 2121/2122
+      [2121]: 'ProtoOATraderReq',
+      [2122]: 'ProtoOATraderRes',
       
       // Reconcile (Positions)
       [ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ]: 'ProtoOAReconcileReq',
       [ProtoOAPayloadType.PROTO_OA_RECONCILE_RES]: 'ProtoOAReconcileRes',
       
-      // Symbols
-      [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ]: 'ProtoOASymbolsListReq',
-      [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES]: 'ProtoOASymbolsListRes',
+      // Symbols - FIXED: Now using correct IDs 2114/2115
+      [2114]: 'ProtoOASymbolsListReq',
+      [2115]: 'ProtoOASymbolsListRes',
       
       // Accounts by token
       [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
@@ -270,17 +270,17 @@ export class ProtoLoader {
       [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ]: 'ProtoOAAccountAuthReq',
       [ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES]: 'ProtoOAAccountAuthRes',
       
-      // Trader (Account Info)
-      [ProtoOAPayloadType.PROTO_OA_TRADER_REQ]: 'ProtoOATraderReq',
-      [ProtoOAPayloadType.PROTO_OA_TRADER_RES]: 'ProtoOATraderRes',
+      // Trader (Account Info) - FIXED: Now using correct IDs 2121/2122
+      [2121]: 'ProtoOATraderReq',
+      [2122]: 'ProtoOATraderRes',
       
       // Reconcile (Positions)
       [ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ]: 'ProtoOAReconcileReq',
       [ProtoOAPayloadType.PROTO_OA_RECONCILE_RES]: 'ProtoOAReconcileRes',
       
-      // Symbols
-      [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ]: 'ProtoOASymbolsListReq',
-      [ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES]: 'ProtoOASymbolsListRes',
+      // Symbols - FIXED: Now using correct IDs 2114/2115
+      [2114]: 'ProtoOASymbolsListReq',
+      [2115]: 'ProtoOASymbolsListRes',
       
       // Accounts by token
       [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
