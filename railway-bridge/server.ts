@@ -211,6 +211,9 @@ app.post('/api/account', async (c) => {
     });
   } catch (error) {
     console.error('[Account] Error:', error);
+    console.error('[Account] Error message:', error?.message);
+    console.error('[Account] Error stack:', error?.stack);
+    console.error('[Account] Error name:', error?.name);
     return c.json(handleError(error, 'api/account'), 500);
   }
 });

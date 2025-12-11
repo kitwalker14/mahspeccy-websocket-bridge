@@ -47,7 +47,9 @@ export class ConnectionPool {
    * Get connection key for pooling
    */
   private getKey(credentials: CTraderCredentials): string {
-    return `${credentials.isDemo ? 'demo' : 'live'}_${credentials.accountId}`;
+    // Include first 8 chars of access token in key to detect token changes
+    const tokenPrefix = credentials.accessToken.substring(0, 8);
+    return `${credentials.isDemo ? 'demo' : 'live'}_${credentials.accountId}_${tokenPrefix}`;
   }
 
   /**
@@ -65,9 +67,10 @@ export class ConnectionPool {
       return existing.client;
     }
     
-    // Clean up any existing connection for this key
+    // If connection exists but is in use, create a fresh one
+    console.log(`[ConnectionPool] 🆕 Creating fresh connection: ${key}`);
     if (existing) {
-      console.log(`[ConnectionPool] 🧹 Removing stale connection: ${key}`);
+      console.log(`[ConnectionPool] 🧹 Removing existing connection (inUse=${existing.inUse}): ${key}`);
       existing.client.disconnect();
       this.connections.delete(key);
     }
