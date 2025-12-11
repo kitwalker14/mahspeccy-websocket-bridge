@@ -84,6 +84,24 @@ export class ProtoLoader {
           [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
           [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES]: 'ProtoOAGetAccountListByAccessTokenRes',
           
+          // Trading - NEW ORDER
+          [ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ]: 'ProtoOANewOrderReq',
+          [ProtoOAPayloadType.PROTO_OA_EXECUTION_EVENT]: 'ProtoOAExecutionEvent',
+          [ProtoOAPayloadType.PROTO_OA_ORDER_ERROR_EVENT]: 'ProtoOAOrderErrorEvent',
+          
+          // Trading - MODIFY/CLOSE
+          [ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ]: 'ProtoOAAmendPositionSLTPReq',
+          [ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ]: 'ProtoOAClosePositionReq',
+          
+          // Spots (quotes)
+          [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ]: 'ProtoOASubscribeSpotsReq',
+          [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_RES]: 'ProtoOASubscribeSpotsRes',
+          [ProtoOAPayloadType.PROTO_OA_SPOT_EVENT]: 'ProtoOASpotEvent',
+          
+          // Trendbars (candles)
+          [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarReq',
+          [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
+          
           // Error
           [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
           
@@ -240,6 +258,24 @@ export class ProtoLoader {
       [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
       [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES]: 'ProtoOAGetAccountListByAccessTokenRes',
       
+      // Trading - NEW ORDER
+      [ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ]: 'ProtoOANewOrderReq',
+      [ProtoOAPayloadType.PROTO_OA_EXECUTION_EVENT]: 'ProtoOAExecutionEvent',
+      [ProtoOAPayloadType.PROTO_OA_ORDER_ERROR_EVENT]: 'ProtoOAOrderErrorEvent',
+      
+      // Trading - MODIFY/CLOSE
+      [ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ]: 'ProtoOAAmendPositionSLTPReq',
+      [ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ]: 'ProtoOAClosePositionReq',
+      
+      // Spots (quotes)
+      [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ]: 'ProtoOASubscribeSpotsReq',
+      [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_RES]: 'ProtoOASubscribeSpotsRes',
+      [ProtoOAPayloadType.PROTO_OA_SPOT_EVENT]: 'ProtoOASpotEvent',
+      
+      // Trendbars (candles)
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarReq',
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
+      
       // Error
       [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
       
@@ -285,6 +321,24 @@ export class ProtoLoader {
       // Accounts by token
       [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ]: 'ProtoOAGetAccountListByAccessTokenReq',
       [ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES]: 'ProtoOAGetAccountListByAccessTokenRes',
+      
+      // Trading - NEW ORDER
+      [ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ]: 'ProtoOANewOrderReq',
+      [ProtoOAPayloadType.PROTO_OA_EXECUTION_EVENT]: 'ProtoOAExecutionEvent',
+      [ProtoOAPayloadType.PROTO_OA_ORDER_ERROR_EVENT]: 'ProtoOAOrderErrorEvent',
+      
+      // Trading - MODIFY/CLOSE
+      [ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ]: 'ProtoOAAmendPositionSLTPReq',
+      [ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ]: 'ProtoOAClosePositionReq',
+      
+      // Spots (quotes)
+      [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ]: 'ProtoOASubscribeSpotsReq',
+      [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_RES]: 'ProtoOASubscribeSpotsRes',
+      [ProtoOAPayloadType.PROTO_OA_SPOT_EVENT]: 'ProtoOASpotEvent',
+      
+      // Trendbars (candles)
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarReq',
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
       
       // Error
       [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
