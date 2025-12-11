@@ -65,10 +65,10 @@ export class CTraderClient {
     
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.error(`[CTraderClient] ❌ Connection timeout after 10s`);
+        console.error(`[CTraderClient] ❌ Connection timeout after 15s`);
         this.disconnect();
         reject(new Error('WebSocket connection timeout'));
-      }, 10000); // 10s timeout
+      }, 15000); // 15s timeout (increased from 10s)
 
       try {
         console.log(`[CTraderClient] Creating WebSocket...`);
