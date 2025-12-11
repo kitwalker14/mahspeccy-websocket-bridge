@@ -97,13 +97,17 @@ function validateRequest(body: any): { valid: boolean; error?: string; credentia
     return { valid: false, error: 'Request body is required' };
   }
 
-  const { clientId, clientSecret, accessToken, accountId, isDemo } = body;
+  const { accessToken, accountId, isDemo } = body;
+
+  // ✅ Get client credentials from environment variables (SECURE)
+  const clientId = Deno.env.get('CTRADER_CLIENT_ID');
+  const clientSecret = Deno.env.get('CTRADER_CLIENT_SECRET');
 
   if (!clientId) {
-    return { valid: false, error: 'clientId is required' };
+    return { valid: false, error: 'CTRADER_CLIENT_ID not configured in environment' };
   }
   if (!clientSecret) {
-    return { valid: false, error: 'clientSecret is required' };
+    return { valid: false, error: 'CTRADER_CLIENT_SECRET not configured in environment' };
   }
   if (!accessToken) {
     return { valid: false, error: 'accessToken is required' };
@@ -131,13 +135,17 @@ function validateAccountsRequest(body: any): { valid: boolean; error?: string; c
     return { valid: false, error: 'Request body is required' };
   }
 
-  const { clientId, clientSecret, accessToken, isDemo } = body;
+  const { accessToken, isDemo } = body;
+
+  // ✅ Get client credentials from environment variables (SECURE)
+  const clientId = Deno.env.get('CTRADER_CLIENT_ID');
+  const clientSecret = Deno.env.get('CTRADER_CLIENT_SECRET');
 
   if (!clientId) {
-    return { valid: false, error: 'clientId is required' };
+    return { valid: false, error: 'CTRADER_CLIENT_ID not configured in environment' };
   }
   if (!clientSecret) {
-    return { valid: false, error: 'clientSecret is required' };
+    return { valid: false, error: 'CTRADER_CLIENT_SECRET not configured in environment' };
   }
   if (!accessToken) {
     return { valid: false, error: 'accessToken is required' };
