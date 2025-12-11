@@ -197,21 +197,24 @@ app.post('/api/account', async (c) => {
     console.log(`[Account] ✅ Success for account ${credentials.accountId}`);
     console.log(`[Account] 📊 Trader data:`, {
       hasTrader: !!traderData.trader,
-      balance: traderData.trader?.balance,
-      equity: traderData.trader?.equity,
+      balanceInCents: traderData.trader?.balance,
+      equityInCents: traderData.trader?.equity,
+      balance: traderData.trader?.balance ? traderData.trader.balance / 100 : 0,
+      equity: traderData.trader?.equity ? traderData.trader.equity / 100 : 0,
     });
 
     // cTrader response structure: { ctidTraderAccountId, trader: { balance, equity, ... } }
+    // ⚠️ CRITICAL: All monetary values in cTrader are in CENTS and must be divided by 100
     const trader = traderData.trader || {};
 
     return c.json({
       success: true,
       data: {
         accountId: credentials.accountId,
-        balance: trader.balance || 0,
-        equity: trader.equity || 0,
-        freeMargin: trader.freeMargin || 0,
-        margin: trader.margin || 0,
+        balance: trader.balance ? trader.balance / 100 : 0,
+        equity: trader.equity ? trader.equity / 100 : 0,
+        freeMargin: trader.freeMargin ? trader.freeMargin / 100 : 0,
+        margin: trader.margin ? trader.margin / 100 : 0,
         leverage: trader.leverageInCents ? trader.leverageInCents / 100 : 1,
         currency: 'USD', // TODO: Get from trader data
         isDemo: credentials.isDemo,
