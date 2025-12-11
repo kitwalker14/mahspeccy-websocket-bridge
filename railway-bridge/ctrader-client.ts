@@ -16,6 +16,11 @@ import {
   type TraderReq,
   type SymbolsListReq,
   type ReconcileReq,
+  type NewOrderReq,
+  type AmendPositionSLTPReq,
+  type ClosePositionReq,
+  ProtoOAOrderType,
+  ProtoOATradeSide,
 } from './proto-messages.ts';
 import { protoLoader } from './proto-loader.ts';
 
@@ -435,10 +440,338 @@ export class CTraderClient {
   }
 
   /**
+   * Place a new order
+   */
+  async placeOrder(accountId: string, symbolId: number, orderType: ProtoOAOrderType, tradeSide: ProtoOATradeSide, volume: number, price: number): Promise<any> {
+    if (!this.accountAuthenticated) {
+      throw new Error('Account not authenticated');
+    }
+
+    console.log('[CTraderClient] Placing new order...');
+    
+    const request: NewOrderReq = {
+      ctidTraderAccountId: parseInt(accountId),
+      symbolId,
+      orderType,
+      tradeSide,
+      volume,
+      price,
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ,
+      request,
+      30000 // 30s timeout for order placement
+    );
+    
+    return response;
+  }
+
+  /**
+   * Amend position SL/TP
+   */
+  async amendPositionSLTP(accountId: string, positionId: number, stopLoss: number, takeProfit: number): Promise<any> {
+    if (!this.accountAuthenticated) {
+      throw new Error('Account not authenticated');
+    }
+
+    console.log('[CTraderClient] Amending position SL/TP...');
+    
+    const request: AmendPositionSLTPReq = {
+      ctidTraderAccountId: parseInt(accountId),
+      positionId,
+      stopLoss,
+      takeProfit,
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SL_TP_REQ,
+      request,
+      30000 // 30s timeout for amendment
+    );
+    
+    return response;
+  }
+
+  /**
+   * Close position
+   */
+  async closePosition(accountId: string, positionId: number): Promise<any> {
+    if (!this.accountAuthenticated) {
+      throw new Error('Account not authenticated');
+    }
+
+    console.log('[CTraderClient] Closing position...');
+    
+    const request: ClosePositionReq = {
+      ctidTraderAccountId: parseInt(accountId),
+      positionId,
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ,
+      request,
+      30000 // 30s timeout for closure
+    );
+    
+    return response;
+  }
+
+  /**
    * Full authentication flow
    */
   async fullAuth(credentials: CTraderCredentials): Promise<void> {
     await this.authenticateApp(credentials.clientId, credentials.clientSecret);
     await this.authenticateAccount(credentials.accountId, credentials.accessToken);
+  }
+
+  // ============================================================================
+  // HIGH-LEVEL TRADING METHODS (called by server.ts)
+  // ============================================================================
+
+  /**
+   * Helper: Get symbol ID from symbol name
+   */
+  private async getSymbolId(accountId: string, symbolName: string): Promise<number> {
+    const symbolsData = await this.getSymbols(accountId);
+    const symbol = symbolsData.symbol?.find((s: any) => s.symbolName === symbolName);
+    
+    if (!symbol) {
+      throw new Error(`Symbol not found: ${symbolName}`);
+    }
+    
+    return symbol.symbolId;
+  }
+
+  /**
+   * Place a market order
+   */
+  async placeMarketOrder(params: {
+    accountId: string;
+    symbol: string;
+    volume: number;
+    tradeSide: 'BUY' | 'SELL';
+    stopLoss?: number;
+    takeProfit?: number;
+  }): Promise<any> {
+    console.log('[CTraderClient] 📊 placeMarketOrder called:', params);
+    
+    // Get symbol ID
+    const symbolId = await this.getSymbolId(params.accountId, params.symbol);
+    console.log(`[CTraderClient] ✅ Symbol ID for ${params.symbol}: ${symbolId}`);
+    
+    // Build request
+    const request: NewOrderReq = {
+      ctidTraderAccountId: parseInt(params.accountId),
+      symbolId,
+      orderType: ProtoOAOrderType.MARKET,
+      tradeSide: params.tradeSide === 'BUY' ? ProtoOATradeSide.BUY : ProtoOATradeSide.SELL,
+      volume: Math.round(params.volume), // Already in centilots from server.ts
+      stopLoss: params.stopLoss,
+      takeProfit: params.takeProfit,
+    };
+    
+    console.log('[CTraderClient] 📤 Sending market order request:', request);
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ,
+      request,
+      30000 // 30s timeout
+    );
+    
+    console.log('[CTraderClient] ✅ Market order response:', response);
+    return response;
+  }
+
+  /**
+   * Place a limit order
+   */
+  async placeLimitOrder(params: {
+    accountId: string;
+    symbol: string;
+    volume: number;
+    tradeSide: 'BUY' | 'SELL';
+    limitPrice: number;
+    stopLoss?: number;
+    takeProfit?: number;
+  }): Promise<any> {
+    console.log('[CTraderClient] 📊 placeLimitOrder called:', params);
+    
+    // Get symbol ID
+    const symbolId = await this.getSymbolId(params.accountId, params.symbol);
+    
+    // Build request
+    const request: NewOrderReq = {
+      ctidTraderAccountId: parseInt(params.accountId),
+      symbolId,
+      orderType: ProtoOAOrderType.LIMIT,
+      tradeSide: params.tradeSide === 'BUY' ? ProtoOATradeSide.BUY : ProtoOATradeSide.SELL,
+      volume: Math.round(params.volume), // Already in centilots
+      limitPrice: params.limitPrice,
+      stopLoss: params.stopLoss,
+      takeProfit: params.takeProfit,
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ,
+      request,
+      30000
+    );
+    
+    return response;
+  }
+
+  /**
+   * Place a stop order
+   */
+  async placeStopOrder(params: {
+    accountId: string;
+    symbol: string;
+    volume: number;
+    tradeSide: 'BUY' | 'SELL';
+    stopPrice: number;
+    stopLoss?: number;
+    takeProfit?: number;
+  }): Promise<any> {
+    console.log('[CTraderClient] 📊 placeStopOrder called:', params);
+    
+    // Get symbol ID
+    const symbolId = await this.getSymbolId(params.accountId, params.symbol);
+    
+    // Build request
+    const request: NewOrderReq = {
+      ctidTraderAccountId: parseInt(params.accountId),
+      symbolId,
+      orderType: ProtoOAOrderType.STOP,
+      tradeSide: params.tradeSide === 'BUY' ? ProtoOATradeSide.BUY : ProtoOATradeSide.SELL,
+      volume: Math.round(params.volume), // Already in centilots
+      stopPrice: params.stopPrice,
+      stopLoss: params.stopLoss,
+      takeProfit: params.takeProfit,
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ,
+      request,
+      30000
+    );
+    
+    return response;
+  }
+
+  /**
+   * Modify position (update SL/TP)
+   */
+  async modifyPosition(params: {
+    accountId: string;
+    positionId: number;
+    stopLoss?: number;
+    takeProfit?: number;
+  }): Promise<any> {
+    console.log('[CTraderClient] 📊 modifyPosition called:', params);
+    
+    const request: AmendPositionSLTPReq = {
+      ctidTraderAccountId: parseInt(params.accountId),
+      positionId: params.positionId,
+      stopLoss: params.stopLoss,
+      takeProfit: params.takeProfit,
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ,
+      request,
+      30000
+    );
+    
+    return response;
+  }
+
+  /**
+   * Close position
+   */
+  async closePosition(params: {
+    accountId: string;
+    positionId: number;
+  }): Promise<any> {
+    console.log('[CTraderClient] 📊 closePosition called:', params);
+    
+    // Get position details to know the volume
+    const positionsData = await this.getPositions(params.accountId);
+    const position = positionsData.position?.find((p: any) => p.positionId === params.positionId);
+    
+    if (!position) {
+      throw new Error(`Position not found: ${params.positionId}`);
+    }
+    
+    const request: ClosePositionReq = {
+      ctidTraderAccountId: parseInt(params.accountId),
+      positionId: params.positionId,
+      volume: position.tradeData.volume, // Full volume to close entire position
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ,
+      request,
+      30000
+    );
+    
+    return response;
+  }
+
+  /**
+   * Subscribe to spot events (real-time quotes)
+   */
+  async subscribeToSpotEvent(accountId: string, symbol: string): Promise<any> {
+    console.log('[CTraderClient] 📊 subscribeToSpotEvent called');
+    
+    // Get symbol ID
+    const symbolId = await this.getSymbolId(accountId, symbol);
+    
+    const request = {
+      ctidTraderAccountId: parseInt(accountId),
+      symbolId: [symbolId],
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
+      request,
+      30000
+    );
+    
+    return response;
+  }
+
+  /**
+   * Get trendbars (historical candles)
+   */
+  async getTrendbars(params: {
+    accountId: string;
+    symbol: string;
+    period: string;
+    fromTimestamp?: number;
+    toTimestamp?: number;
+    count?: number;
+  }): Promise<any> {
+    console.log('[CTraderClient] 📊 getTrendbars called');
+    
+    // Get symbol ID
+    const symbolId = await this.getSymbolId(params.accountId, params.symbol);
+    
+    const request = {
+      ctidTraderAccountId: parseInt(params.accountId),
+      symbolId,
+      period: params.period,
+      fromTimestamp: params.fromTimestamp,
+      toTimestamp: params.toTimestamp,
+      count: params.count || 100,
+    };
+    
+    const response = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ,
+      request,
+      60000 // Longer timeout for historical data
+    );
+    
+    return response;
   }
 }

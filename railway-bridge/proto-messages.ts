@@ -225,3 +225,90 @@ export interface ErrorRes {
   description?: string;
   maintenanceEndTimestamp?: number;
 }
+
+// ============================================================================
+// TRADING ORDER TYPES
+// ============================================================================
+
+export enum ProtoOAOrderType {
+  MARKET = 1,
+  LIMIT = 2,
+  STOP = 3,
+  STOP_LIMIT = 4,
+  MARKET_RANGE = 5,
+  STOP_LOSS_TAKE_PROFIT = 6,
+}
+
+export enum ProtoOATradeSide {
+  BUY = 1,
+  SELL = 2,
+}
+
+export interface NewOrderReq {
+  ctidTraderAccountId: number;
+  symbolId: number;
+  orderType: ProtoOAOrderType;
+  tradeSide: ProtoOATradeSide;
+  volume: number; // in centilots (0.01 lot = 1000 centilots)
+  limitPrice?: number;
+  stopPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  comment?: string;
+  label?: string;
+  positionId?: number;
+  clientOrderId?: string;
+  relativeStopLoss?: number;
+  relativeTakeProfit?: number;
+  guaranteedStopLoss?: boolean;
+  trailingStopLoss?: boolean;
+  stopTriggerMethod?: number;
+}
+
+export interface ExecutionEvent {
+  ctidTraderAccountId: number;
+  executionType: string;
+  position?: {
+    positionId: number;
+    tradeData: {
+      symbolId: number;
+      volume: number;
+      tradeSide: number;
+      openPrice: number;
+      openTimestamp: number;
+      commission: number;
+      swap: number;
+      profit: number;
+    };
+  };
+  order?: {
+    orderId: number;
+    orderType: number;
+    tradeSide: number;
+    orderStatus: number;
+  };
+  deal?: {
+    dealId: number;
+    orderId: number;
+    positionId: number;
+    volume: number;
+    filledVolume: number;
+  };
+  errorCode?: string;
+  isServerEvent?: boolean;
+}
+
+export interface AmendPositionSLTPReq {
+  ctidTraderAccountId: number;
+  positionId: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  guaranteedStopLoss?: boolean;
+  trailingStopLoss?: boolean;
+}
+
+export interface ClosePositionReq {
+  ctidTraderAccountId: number;
+  positionId: number;
+  volume: number;
+}
