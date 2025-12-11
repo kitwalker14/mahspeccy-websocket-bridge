@@ -92,6 +92,8 @@ export class ProtoLoader {
           // Trading - MODIFY/CLOSE
           [ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ]: 'ProtoOAAmendPositionSLTPReq',
           [ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ]: 'ProtoOAClosePositionReq',
+          [ProtoOAPayloadType.PROTO_OA_CANCEL_ORDER_REQ]: 'ProtoOACancelOrderReq',
+          [ProtoOAPayloadType.PROTO_OA_AMEND_ORDER_REQ]: 'ProtoOAAmendOrderReq',
           
           // Spots (quotes)
           [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ]: 'ProtoOASubscribeSpotsReq',
@@ -99,7 +101,7 @@ export class ProtoLoader {
           [ProtoOAPayloadType.PROTO_OA_SPOT_EVENT]: 'ProtoOASpotEvent',
           
           // Trendbars (candles)
-          [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarReq',
+          [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarsReq',
           [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
           
           // Error
@@ -266,6 +268,8 @@ export class ProtoLoader {
       // Trading - MODIFY/CLOSE
       [ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ]: 'ProtoOAAmendPositionSLTPReq',
       [ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ]: 'ProtoOAClosePositionReq',
+      [ProtoOAPayloadType.PROTO_OA_CANCEL_ORDER_REQ]: 'ProtoOACancelOrderReq',
+      [ProtoOAPayloadType.PROTO_OA_AMEND_ORDER_REQ]: 'ProtoOAAmendOrderReq',
       
       // Spots (quotes)
       [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ]: 'ProtoOASubscribeSpotsReq',
@@ -273,7 +277,7 @@ export class ProtoLoader {
       [ProtoOAPayloadType.PROTO_OA_SPOT_EVENT]: 'ProtoOASpotEvent',
       
       // Trendbars (candles)
-      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarReq',
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarsReq',
       [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
       
       // Error
@@ -330,6 +334,8 @@ export class ProtoLoader {
       // Trading - MODIFY/CLOSE
       [ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ]: 'ProtoOAAmendPositionSLTPReq',
       [ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ]: 'ProtoOAClosePositionReq',
+      [ProtoOAPayloadType.PROTO_OA_CANCEL_ORDER_REQ]: 'ProtoOACancelOrderReq',
+      [ProtoOAPayloadType.PROTO_OA_AMEND_ORDER_REQ]: 'ProtoOAAmendOrderReq',
       
       // Spots (quotes)
       [ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ]: 'ProtoOASubscribeSpotsReq',
@@ -337,7 +343,7 @@ export class ProtoLoader {
       [ProtoOAPayloadType.PROTO_OA_SPOT_EVENT]: 'ProtoOASpotEvent',
       
       // Trendbars (candles)
-      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarReq',
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarsReq',
       [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
       
       // Error
