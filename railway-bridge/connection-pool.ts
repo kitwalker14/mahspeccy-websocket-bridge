@@ -56,12 +56,16 @@ export class ConnectionPool {
   async getConnection(credentials: CTraderCredentials, skipAccountAuth = false): Promise<CTraderClient> {
     const key = this.getKey(credentials);
     
-    // ALWAYS create fresh connection (no connection reuse)
-    // This ensures account authentication is always fresh
-    console.log(`[ConnectionPool] 🆕 Creating fresh connection: ${key}`);
+    // Check if we have an existing connection that's not in use
+    const existing = this.connections.get(key);
+    if (existing && !existing.inUse) {
+      console.log(`[ConnectionPool] ♻️ Reusing existing connection: ${key}`);
+      existing.inUse = true;
+      existing.lastUsed = Date.now();
+      return existing.client;
+    }
     
     // Clean up any existing connection for this key
-    const existing = this.connections.get(key);
     if (existing) {
       console.log(`[ConnectionPool] 🧹 Removing stale connection: ${key}`);
       existing.client.disconnect();
