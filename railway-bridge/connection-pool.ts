@@ -140,29 +140,86 @@ export class ConnectionPool {
 
   /**
    * Execute request with automatic connection management
+   * ✅ NEW: Automatic retry on connection errors
    */
   async withConnection<T>(
     credentials: CTraderCredentials,
     callback: (client: CTraderClient) => Promise<T>,
     skipAccountAuth = false
   ): Promise<T> {
-    const client = await this.getConnection(credentials, skipAccountAuth);
+    const maxRetries = 2; // Try up to 2 times (initial + 1 retry)
+    let lastError: Error | null = null;
     
-    try {
-      const result = await callback(client);
-      this.releaseConnection(credentials);
-      return result;
-    } catch (error) {
-      // On error, remove connection from pool (might be stale)
-      const key = this.getKey(credentials);
-      const connection = this.connections.get(key);
-      if (connection) {
-        connection.client.disconnect();
-        this.connections.delete(key);
-        console.log(`[ConnectionPool] ❌ Removed failed connection: ${key}`);
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const client = await this.getConnection(credentials, skipAccountAuth);
+        
+        try {
+          const result = await callback(client);
+          this.releaseConnection(credentials);
+          return result;
+        } catch (error) {
+          const key = this.getKey(credentials);
+          const connection = this.connections.get(key);
+          
+          // Check if this is a connection error that we should retry
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const isConnectionError = 
+            errorMessage.includes('Connection closed') ||
+            errorMessage.includes('ECONNRESET') ||
+            errorMessage.includes('socket hang up') ||
+            errorMessage.includes('timeout');
+          
+          if (isConnectionError && attempt < maxRetries - 1) {
+            console.log(`[ConnectionPool] ⚠️ Connection error on attempt ${attempt + 1}, retrying...`);
+            console.log(`[ConnectionPool] Error: ${errorMessage}`);
+            
+            // Remove stale connection
+            if (connection) {
+              connection.client.disconnect();
+              this.connections.delete(key);
+              console.log(`[ConnectionPool] ❌ Removed failed connection: ${key}`);
+            }
+            
+            // Wait a bit before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+            lastError = error instanceof Error ? error : new Error(String(error));
+            continue; // Retry
+          }
+          
+          // Not a connection error or out of retries - fail immediately
+          if (connection) {
+            connection.client.disconnect();
+            this.connections.delete(key);
+            console.log(`[ConnectionPool] ❌ Removed failed connection: ${key}`);
+          }
+          throw error;
+        }
+      } catch (error) {
+        // Error during getConnection() itself
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isConnectionError = 
+          errorMessage.includes('Connection closed') ||
+          errorMessage.includes('ECONNRESET') ||
+          errorMessage.includes('socket hang up') ||
+          errorMessage.includes('timeout');
+        
+        if (isConnectionError && attempt < maxRetries - 1) {
+          console.log(`[ConnectionPool] ⚠️ Connection setup error on attempt ${attempt + 1}, retrying...`);
+          console.log(`[ConnectionPool] Error: ${errorMessage}`);
+          
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          lastError = error instanceof Error ? error : new Error(String(error));
+          continue; // Retry
+        }
+        
+        throw error;
       }
-      throw error;
     }
+    
+    // All retries failed
+    throw lastError || new Error('Connection failed after retries');
   }
 
   /**
