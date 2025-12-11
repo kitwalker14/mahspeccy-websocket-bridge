@@ -64,10 +64,14 @@ export class CTraderClient {
     console.log(`[CTraderClient] Environment: ${this.host.includes('demo') ? 'DEMO' : 'LIVE'}`);
     
     return new Promise((resolve, reject) => {
+      let connectionEstablished = false;
+      
       const timeout = setTimeout(() => {
-        console.error(`[CTraderClient] ❌ Connection timeout after 15s`);
-        this.disconnect();
-        reject(new Error('WebSocket connection timeout'));
+        if (!connectionEstablished) {
+          console.error(`[CTraderClient] ❌ Connection timeout after 15s`);
+          this.disconnect();
+          reject(new Error('WebSocket connection timeout'));
+        }
       }, 15000); // 15s timeout (increased from 10s)
 
       try {
@@ -79,6 +83,7 @@ export class CTraderClient {
         console.log(`[CTraderClient] Binary type set to: ${this.ws.binaryType}`);
 
         this.ws.onopen = () => {
+          connectionEstablished = true;
           clearTimeout(timeout);
           console.log(`[CTraderClient] ✅ WebSocket connected!`);
           console.log(`[CTraderClient] ReadyState: ${this.ws?.readyState} (OPEN=1)`);
@@ -91,16 +96,24 @@ export class CTraderClient {
           console.error(`[CTraderClient] ❌ WebSocket error:`, error);
           console.error(`[CTraderClient] Error type:`, error.type);
           console.error(`[CTraderClient] ReadyState: ${this.ws?.readyState}`);
-          reject(new Error(`WebSocket error: ${error.type}`));
+          if (!connectionEstablished) {
+            reject(new Error(`WebSocket error: ${error.type}`));
+          }
         };
 
         this.ws.onclose = (event: CloseEvent) => {
-          console.log(`[CTraderClient] 🔌 WebSocket closed`);
+          clearTimeout(timeout);
+          console.log(`[CTraderClient] 🔌 WebSocket closed ${connectionEstablished ? 'after connection' : 'during connection'}`);
           console.log(`[CTraderClient] Code: ${event.code}, Reason: ${event.reason || 'No reason provided'}`);
           console.log(`[CTraderClient] Was clean: ${event.wasClean}`);
           this.stopHeartbeat();
           this.appAuthenticated = false;
           this.accountAuthenticated = false;
+          
+          // If connection not yet established, reject the connection promise
+          if (!connectionEstablished) {
+            reject(new Error(`WebSocket closed before connection (code: ${event.code}, reason: ${event.reason || 'none'})`));
+          }
         };
 
         this.ws.onmessage = (event: MessageEvent) => {
