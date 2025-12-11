@@ -195,16 +195,25 @@ app.post('/api/account', async (c) => {
     });
 
     console.log(`[Account] ✅ Success for account ${credentials.accountId}`);
+    console.log(`[Account] 📊 Trader data:`, {
+      hasTrader: !!traderData.trader,
+      balance: traderData.trader?.balance,
+      equity: traderData.trader?.equity,
+    });
+
+    // cTrader response structure: { ctidTraderAccountId, trader: { balance, equity, ... } }
+    const trader = traderData.trader || {};
 
     return c.json({
       success: true,
       data: {
         accountId: credentials.accountId,
-        balance: traderData.balance || 0,
-        equity: traderData.equity || 0,
-        freeMargin: traderData.freeMargin || 0,
-        margin: traderData.margin || 0,
-        leverage: traderData.leverage || 1,
+        balance: trader.balance || 0,
+        equity: trader.equity || 0,
+        freeMargin: trader.freeMargin || 0,
+        margin: trader.margin || 0,
+        leverage: trader.leverageInCents ? trader.leverageInCents / 100 : 1,
+        currency: 'USD', // TODO: Get from trader data
         isDemo: credentials.isDemo,
         timestamp: new Date().toISOString(),
       },
