@@ -102,7 +102,7 @@ export class ProtoLoader {
           
           // Trendbars (candles)
           [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarsReq',
-          [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
+          [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarsRes',
           
           // Error
           [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
@@ -278,7 +278,7 @@ export class ProtoLoader {
       
       // Trendbars (candles)
       [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarsReq',
-      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarsRes',
       
       // Error
       [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
@@ -344,7 +344,7 @@ export class ProtoLoader {
       
       // Trendbars (candles)
       [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ]: 'ProtoOAGetTrendbarsReq',
-      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarRes',
+      [ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES]: 'ProtoOAGetTrendbarsRes',
       
       // Error
       [ProtoOAPayloadType.PROTO_OA_ERROR_RES]: 'ProtoOAErrorRes',
