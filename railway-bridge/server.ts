@@ -571,7 +571,7 @@ app.post('/api/quote', async (c) => {
 
     // Subscribe to spot event and get latest price
     const quoteData = await connectionPool.withConnection(credentials, async (client) => {
-      return await client.subscribeToSpotEvent(credentials.accountId, symbolId);
+      return await client.subscribeToSpotEvent(credentials.accountId, parseInt(symbolId)); // ✅ Parse symbolId as integer
     });
 
     console.log(`[Quote] ✅ Success for symbolId=${symbolId}`);
@@ -617,7 +617,7 @@ app.post('/api/trade/market', async (c) => {
     const orderData = await connectionPool.withConnection(credentials, async (client) => {
       return await client.placeMarketOrder({
         accountId: credentials.accountId,
-        symbolId,
+        symbolId: parseInt(symbolId), // ✅ CRITICAL: Parse symbolId as integer for protobuf
         volume: volume * 100, // Convert to centiLots
         tradeSide: side === 'BUY' ? 'BUY' : 'SELL',
         stopLoss,
