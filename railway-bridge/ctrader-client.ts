@@ -839,6 +839,11 @@ export class CTraderClient {
   async subscribeToSpotEvent(accountId: string, symbolId: number): Promise<any> {
     console.log(`[CTraderClient] 📊 subscribeToSpotEvent called for symbolId=${symbolId}`);
     
+    // ✅ CRITICAL FIX: Check connection health FIRST
+    if (!this.ws || this.ws.readyState !== 1) { // 1 = OPEN
+      throw new Error('WebSocket not connected - cannot subscribe to spot events');
+    }
+    
     // ✅ Check if we already have cached data (already subscribed)
     if (this.subscribedSymbols.has(symbolId)) {
       console.log(`[CTraderClient] ⚡ Symbol ${symbolId} already subscribed`);
@@ -852,35 +857,57 @@ export class CTraderClient {
           ask: cached.ask,
           timestamp: cached.timestamp,
         };
-      } else {
-        console.warn(`[CTraderClient] ⚠️ Subscribed but no cached data yet, will wait for spot event...`);
       }
-    }
-    
-    // ✅ CRITICAL FIX: Check connection health BEFORE subscribing
-    if (!this.ws || this.ws.readyState !== 1) { // 1 = OPEN
-      throw new Error('WebSocket not connected - cannot subscribe to spot events');
+      
+      // ✅ CRITICAL FIX: If subscribed but no cache, wait for next spot event WITHOUT re-subscribing
+      // Re-subscribing causes ALREADY_SUBSCRIBED error and connection closure
+      console.log(`[CTraderClient] ⏳ Already subscribed to ${symbolId}, waiting for next spot event...`);
+      
+      const maxWait = 5000; // 5 seconds for already-subscribed symbol
+      const start = Date.now();
+      
+      while (Date.now() - start < maxWait) {
+        if (!this.ws || this.ws.readyState !== 1) {
+          throw new Error('WebSocket connection lost while waiting for spot event');
+        }
+        
+        const cached = this.spotCache.get(symbolId);
+        if (cached) {
+          console.log(`[CTraderClient] ✅ Spot event received! bid=${cached.bid}, ask=${cached.ask}`);
+          return {
+            bid: cached.bid,
+            ask: cached.ask,
+            timestamp: cached.timestamp,
+          };
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // ✅ If still no data after waiting, return error with diagnostics
+      console.error(`[CTraderClient] ❌ No spot event received for already-subscribed symbol ${symbolId}`);
+      console.error(`[CTraderClient] This indicates cTrader is not sending spot events`);
+      console.error(`[CTraderClient] Connection state: ${this.ws?.readyState}`);
+      throw new Error(`No spot events received for symbolId=${symbolId} after 5s wait`);
     }
     
     // ✅ If not subscribed, send subscription request
-    if (!this.subscribedSymbols.has(symbolId)) {
-      const request = {
-        ctidTraderAccountId: parseInt(accountId),
-        symbolId: [symbolId], // cTrader expects array of symbolIds
-      };
-      
-      console.log(`[CTraderClient] 📤 Sending PROTO_OA_SUBSCRIBE_SPOTS_REQ for symbolId=${symbolId}`);
-      
-      await this.sendRequest(
-        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
-        request,
-        30000
-      );
-      
-      // ✅ Track this symbol as subscribed
-      this.subscribedSymbols.add(symbolId);
-      console.log(`[CTraderClient] ✅ Symbol ${symbolId} subscribed successfully`);
-    }
+    const request = {
+      ctidTraderAccountId: parseInt(accountId),
+      symbolId: [symbolId], // cTrader expects array of symbolIds
+    };
+    
+    console.log(`[CTraderClient] 📤 Sending PROTO_OA_SUBSCRIBE_SPOTS_REQ for symbolId=${symbolId}`);
+    
+    await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
+      request,
+      30000
+    );
+    
+    // ✅ Track this symbol as subscribed
+    this.subscribedSymbols.add(symbolId);
+    console.log(`[CTraderClient] ✅ Symbol ${symbolId} subscribed successfully`);
     
     // ✅ CRITICAL FIX: Wait for the PROTO_OA_SPOT_EVENT to arrive and be cached
     // ✅ Keep checking connection health during polling
