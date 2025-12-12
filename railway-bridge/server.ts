@@ -52,6 +52,10 @@ app.use('*', async (c, next) => {
 app.get('/health', (c) => {
   const stats = connectionPool.getStats();
   
+  // ✅ Check if environment variables are configured
+  const hasClientId = !!Deno.env.get('CTRADER_CLIENT_ID');
+  const hasClientSecret = !!Deno.env.get('CTRADER_CLIENT_SECRET');
+  
   return c.json({
     status: 'healthy',
     uptime: Math.floor((Date.now() - startTime) / 1000),
@@ -61,6 +65,11 @@ app.get('/health', (c) => {
       total: stats.total,
       inUse: stats.inUse,
       idle: stats.idle,
+    },
+    environment: {
+      hasClientId,
+      hasClientSecret,
+      isConfigured: hasClientId && hasClientSecret,
     },
     features: [
       'Protocol Buffers support',

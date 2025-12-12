@@ -46,6 +46,7 @@ export class CTraderClient {
   }>();
   private heartbeatInterval: number | null = null;
   private accessToken: string;
+  private subscribedSymbols = new Set<number>(); // ✅ Track subscribed symbols to avoid ALREADY_SUBSCRIBED error
 
   constructor(isDemo: boolean) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
@@ -735,6 +736,16 @@ export class CTraderClient {
   async subscribeToSpotEvent(accountId: string, symbolId: number): Promise<any> {
     console.log(`[CTraderClient] 📊 subscribeToSpotEvent called for symbolId=${symbolId}`);
     
+    // ✅ Check if already subscribed to avoid ALREADY_SUBSCRIBED error
+    if (this.subscribedSymbols.has(symbolId)) {
+      console.log(`[CTraderClient] ⚡ Symbol ${symbolId} already subscribed, returning success without resubscribing`);
+      return { 
+        success: true,
+        alreadySubscribed: true,
+        symbolId 
+      };
+    }
+    
     // ✅ symbolId is now passed directly, no need to lookup
     const request = {
       ctidTraderAccountId: parseInt(accountId),
@@ -746,6 +757,10 @@ export class CTraderClient {
       request,
       30000
     );
+    
+    // ✅ Track this symbol as subscribed
+    this.subscribedSymbols.add(symbolId);
+    console.log(`[CTraderClient] ✅ Symbol ${symbolId} subscribed successfully`);
     
     return response;
   }
