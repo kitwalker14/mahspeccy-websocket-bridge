@@ -110,9 +110,14 @@ export class CTraderClient {
 
         this.ws.onclose = (event: CloseEvent) => {
           clearTimeout(timeout);
+          const stack = new Error().stack; // Capture stack trace to see WHO closed the connection
           console.log(`[CTraderClient] 🔌 WebSocket closed ${connectionEstablished ? 'after connection' : 'during connection'}`);
           console.log(`[CTraderClient] Code: ${event.code}, Reason: ${event.reason || 'No reason provided'}`);
           console.log(`[CTraderClient] Was clean: ${event.wasClean}`);
+          console.log(`[CTraderClient] 📍 Close event stack trace:`, stack);
+          console.log(`[CTraderClient] 📊 Auth status - App: ${this.appAuthenticated}, Account: ${this.accountAuthenticated}`);
+          console.log(`[CTraderClient] 📋 Subscribed symbols: ${Array.from(this.subscribedSymbols).join(', ') || 'none'}`);
+          console.log(`[CTraderClient] 💾 Cached quotes: ${Array.from(this.spotCache.keys()).join(', ') || 'none'}`);
           this.stopHeartbeat();
           this.appAuthenticated = false;
           this.accountAuthenticated = false;
@@ -226,8 +231,12 @@ export class CTraderClient {
         console.log('[CTraderClient] 💰 SPOT EVENT received:', payload);
         if (payload.symbolId && (payload.bid !== undefined || payload.ask !== undefined)) {
           const symbolId = payload.symbolId;
-          const bid = payload.bid || 0;
-          const ask = payload.ask || 0;
+          
+          // ✅ CRITICAL FIX: Merge partial spot events instead of overwriting
+          // cTrader sends partial updates (bid-only or ask-only) - we must preserve the other value
+          const existing = this.spotCache.get(symbolId) || { bid: 0, ask: 0, timestamp: 0 };
+          const bid = payload.bid !== undefined ? payload.bid : existing.bid;
+          const ask = payload.ask !== undefined ? payload.ask : existing.ask;
           
           // Cache the quote data
           this.spotCache.set(symbolId, {
