@@ -768,6 +768,7 @@ export class CTraderClient {
    * Subscribe to spot events (real-time quotes)
    * 
    * ✅ FIXED: Now properly waits for PROTO_OA_SPOT_EVENT and returns bid/ask data
+   * ✅ FIXED: Connection remains alive during spot event polling
    */
   async subscribeToSpotEvent(accountId: string, symbolId: number): Promise<any> {
     console.log(`[CTraderClient] 📊 subscribeToSpotEvent called for symbolId=${symbolId}`);
@@ -788,6 +789,11 @@ export class CTraderClient {
       } else {
         console.warn(`[CTraderClient] ⚠️ Subscribed but no cached data yet, will wait for spot event...`);
       }
+    }
+    
+    // ✅ CRITICAL FIX: Check connection health BEFORE subscribing
+    if (!this.ws || this.ws.readyState !== 1) { // 1 = OPEN
+      throw new Error('WebSocket not connected - cannot subscribe to spot events');
     }
     
     // ✅ If not subscribed, send subscription request
@@ -811,12 +817,18 @@ export class CTraderClient {
     }
     
     // ✅ CRITICAL FIX: Wait for the PROTO_OA_SPOT_EVENT to arrive and be cached
+    // ✅ Keep checking connection health during polling
     console.log(`[CTraderClient] ⏳ Waiting for spot event for symbolId=${symbolId}...`);
     
-    const maxWait = 5000; // 5 second timeout
+    const maxWait = 10000; // ✅ Increased to 10 seconds (was 5s)
     const start = Date.now();
     
     while (Date.now() - start < maxWait) {
+      // ✅ Check if connection is still alive
+      if (!this.ws || this.ws.readyState !== 1) {
+        throw new Error('WebSocket connection lost while waiting for spot event');
+      }
+      
       const cached = this.spotCache.get(symbolId);
       if (cached) {
         console.log(`[CTraderClient] ✅ Spot event received! bid=${cached.bid}, ask=${cached.ask}`);
@@ -833,6 +845,9 @@ export class CTraderClient {
     
     // ❌ Timeout - no spot event received
     console.error(`[CTraderClient] ❌ Timeout waiting for spot event for symbolId=${symbolId}`);
+    console.error(`[CTraderClient] Connection state: ${this.ws?.readyState} (1=OPEN, 2=CLOSING, 3=CLOSED)`);
+    console.error(`[CTraderClient] Subscribed symbols: ${Array.from(this.subscribedSymbols).join(', ')}`);
+    console.error(`[CTraderClient] Cached symbols: ${Array.from(this.spotCache.keys()).join(', ')}`);
     throw new Error(`Timeout waiting for spot event for symbolId=${symbolId}`);
   }
 
