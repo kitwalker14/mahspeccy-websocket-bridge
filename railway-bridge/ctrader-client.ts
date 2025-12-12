@@ -48,6 +48,7 @@ export class CTraderClient {
   private accessToken: string;
   private subscribedSymbols = new Set<number>(); // ✅ Track subscribed symbols to avoid ALREADY_SUBSCRIBED error
   private spotCache = new Map<number, { bid: number; ask: number; timestamp: number }>(); // ✅ Cache latest spot events
+  private symbolMetadata = new Map<number, { digits: number; name: string }>(); // ✅ Cache symbol metadata for price transformation
 
   constructor(isDemo: boolean) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
@@ -604,6 +605,28 @@ export class CTraderClient {
           
           this.subscribedSymbols.add(symbolId);
           console.log(`[CTraderClient] ✅ Proactive subscription successful for symbolId=${symbolId}`);
+          
+          // ✅ CRITICAL FIX: Wait for the first spot event to arrive before continuing
+          // This ensures the cache is populated before we return from fullAuth()
+          console.log(`[CTraderClient] ⏳ Waiting for initial spot event for symbolId=${symbolId}...`);
+          
+          const maxWait = 5000; // 5 seconds max wait
+          const start = Date.now();
+          
+          while (Date.now() - start < maxWait) {
+            if (this.spotCache.has(symbolId)) {
+              const cached = this.spotCache.get(symbolId)!;
+              console.log(`[CTraderClient] ✅ Initial spot event received: bid=${cached.bid}, ask=${cached.ask}`);
+              break;
+            }
+            
+            // Wait 100ms before checking again
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
+          if (!this.spotCache.has(symbolId)) {
+            console.warn(`[CTraderClient] ⚠️ No spot event received after 5s for symbolId=${symbolId}`);
+          }
         } catch (error) {
           console.error(`[CTraderClient] ❌ Proactive subscription failed for symbolId=${symbolId}:`, error);
           // Don't throw - continue with other subscriptions
