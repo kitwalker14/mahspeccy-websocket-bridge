@@ -47,6 +47,7 @@ export class CTraderClient {
   private heartbeatInterval: number | null = null;
   private accessToken: string;
   private subscribedSymbols = new Set<number>(); // ✅ Track subscribed symbols to avoid ALREADY_SUBSCRIBED error
+  private spotCache = new Map<number, { bid: number; ask: number; timestamp: number }>(); // ✅ Cache latest spot events
 
   constructor(isDemo: boolean) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
@@ -218,6 +219,26 @@ export class CTraderClient {
       // Handle heartbeat
       if (payloadType === 51) { // HEARTBEAT_EVENT
         return; // Ignore heartbeat responses
+      }
+      
+      // ✅ CRITICAL FIX: Handle PROTO_OA_SPOT_EVENT and cache quote data
+      if (payloadType === ProtoOAPayloadType.PROTO_OA_SPOT_EVENT) {
+        console.log('[CTraderClient] 💰 SPOT EVENT received:', payload);
+        if (payload.symbolId && (payload.bid !== undefined || payload.ask !== undefined)) {
+          const symbolId = payload.symbolId;
+          const bid = payload.bid || 0;
+          const ask = payload.ask || 0;
+          
+          // Cache the quote data
+          this.spotCache.set(symbolId, {
+            bid,
+            ask,
+            timestamp: Date.now(),
+          });
+          
+          console.log(`[CTraderClient] ✅ Cached spot data for symbolId=${symbolId}: bid=${bid}, ask=${ask}`);
+        }
+        return; // Spot events don't have matching requests
       }
       
       // Check for error responses
@@ -745,37 +766,74 @@ export class CTraderClient {
 
   /**
    * Subscribe to spot events (real-time quotes)
+   * 
+   * ✅ FIXED: Now properly waits for PROTO_OA_SPOT_EVENT and returns bid/ask data
    */
   async subscribeToSpotEvent(accountId: string, symbolId: number): Promise<any> {
     console.log(`[CTraderClient] 📊 subscribeToSpotEvent called for symbolId=${symbolId}`);
     
-    // ✅ Check if already subscribed to avoid ALREADY_SUBSCRIBED error
+    // ✅ Check if we already have cached data (already subscribed)
     if (this.subscribedSymbols.has(symbolId)) {
-      console.log(`[CTraderClient] ⚡ Symbol ${symbolId} already subscribed, returning success without resubscribing`);
-      return { 
-        success: true,
-        alreadySubscribed: true,
-        symbolId 
-      };
+      console.log(`[CTraderClient] ⚡ Symbol ${symbolId} already subscribed`);
+      
+      // Return cached data if available
+      const cached = this.spotCache.get(symbolId);
+      if (cached) {
+        console.log(`[CTraderClient] ✅ Returning cached quote: bid=${cached.bid}, ask=${cached.ask}`);
+        return {
+          bid: cached.bid,
+          ask: cached.ask,
+          timestamp: cached.timestamp,
+        };
+      } else {
+        console.warn(`[CTraderClient] ⚠️ Subscribed but no cached data yet, will wait for spot event...`);
+      }
     }
     
-    // ✅ symbolId is now passed directly, no need to lookup
-    const request = {
-      ctidTraderAccountId: parseInt(accountId),
-      symbolId: [symbolId], // cTrader expects array of symbolIds
-    };
+    // ✅ If not subscribed, send subscription request
+    if (!this.subscribedSymbols.has(symbolId)) {
+      const request = {
+        ctidTraderAccountId: parseInt(accountId),
+        symbolId: [symbolId], // cTrader expects array of symbolIds
+      };
+      
+      console.log(`[CTraderClient] 📤 Sending PROTO_OA_SUBSCRIBE_SPOTS_REQ for symbolId=${symbolId}`);
+      
+      await this.sendRequest(
+        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
+        request,
+        30000
+      );
+      
+      // ✅ Track this symbol as subscribed
+      this.subscribedSymbols.add(symbolId);
+      console.log(`[CTraderClient] ✅ Symbol ${symbolId} subscribed successfully`);
+    }
     
-    const response = await this.sendRequest(
-      ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
-      request,
-      30000
-    );
+    // ✅ CRITICAL FIX: Wait for the PROTO_OA_SPOT_EVENT to arrive and be cached
+    console.log(`[CTraderClient] ⏳ Waiting for spot event for symbolId=${symbolId}...`);
     
-    // ✅ Track this symbol as subscribed
-    this.subscribedSymbols.add(symbolId);
-    console.log(`[CTraderClient] ✅ Symbol ${symbolId} subscribed successfully`);
+    const maxWait = 5000; // 5 second timeout
+    const start = Date.now();
     
-    return response;
+    while (Date.now() - start < maxWait) {
+      const cached = this.spotCache.get(symbolId);
+      if (cached) {
+        console.log(`[CTraderClient] ✅ Spot event received! bid=${cached.bid}, ask=${cached.ask}`);
+        return {
+          bid: cached.bid,
+          ask: cached.ask,
+          timestamp: cached.timestamp,
+        };
+      }
+      
+      // Wait 100ms before checking again
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // ❌ Timeout - no spot event received
+    console.error(`[CTraderClient] ❌ Timeout waiting for spot event for symbolId=${symbolId}`);
+    throw new Error(`Timeout waiting for spot event for symbolId=${symbolId}`);
   }
 
   /**
