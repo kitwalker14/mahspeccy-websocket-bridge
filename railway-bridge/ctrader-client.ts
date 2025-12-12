@@ -569,6 +569,40 @@ export class CTraderClient {
   async fullAuth(credentials: CTraderCredentials): Promise<void> {
     await this.authenticateApp(credentials.clientId, credentials.clientSecret);
     await this.authenticateAccount(credentials.accountId, credentials.accessToken);
+    
+    // ✅ CRITICAL FIX: Proactively subscribe to commonly needed symbols
+    // This prevents rapid subscribe/unsubscribe cycles that trigger rate limiting
+    console.log('[CTraderClient] 🔔 Proactively subscribing to common symbols...');
+    
+    // Subscribe to major forex pairs that are commonly queried
+    const commonSymbols = [1]; // symbolId 1 = EURUSD (most commonly used)
+    
+    for (const symbolId of commonSymbols) {
+      if (!this.subscribedSymbols.has(symbolId)) {
+        try {
+          const request = {
+            ctidTraderAccountId: parseInt(credentials.accountId),
+            symbolId: [symbolId],
+          };
+          
+          console.log(`[CTraderClient] 📤 Proactive subscription to symbolId=${symbolId}...`);
+          
+          await this.sendRequest(
+            ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
+            request,
+            30000
+          );
+          
+          this.subscribedSymbols.add(symbolId);
+          console.log(`[CTraderClient] ✅ Proactive subscription successful for symbolId=${symbolId}`);
+        } catch (error) {
+          console.error(`[CTraderClient] ❌ Proactive subscription failed for symbolId=${symbolId}:`, error);
+          // Don't throw - continue with other subscriptions
+        }
+      }
+    }
+    
+    console.log('[CTraderClient] ✅ Proactive subscriptions complete');
   }
 
   // ============================================================================
