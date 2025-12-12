@@ -144,6 +144,17 @@ export class CTraderClient {
   }
 
   /**
+   * Check if connection is healthy
+   */
+  isHealthy(): boolean {
+    return !!(
+      this.ws && 
+      this.ws.readyState === WebSocket.OPEN &&
+      this.appAuthenticated
+    );
+  }
+
+  /**
    * Cleanup resources
    */
   private cleanup(): void {

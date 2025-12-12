@@ -353,6 +353,46 @@ app.post('/api/accounts', async (c) => {
 });
 
 /**
+ * POST /api/reconnect
+ * Force reconnection for an account
+ * Closes existing connection and creates a fresh one
+ */
+app.post('/api/reconnect', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Reconnect] Forcing reconnection for account ${credentials.accountId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Invalidate existing connection
+    connectionPool.invalidateConnection(credentials);
+    console.log(`[Reconnect] ✅ Old connection invalidated`);
+
+    // Force creation of new connection by making a request
+    await connectionPool.withConnection(credentials, async (client) => {
+      // Just test the connection with a simple account request
+      return await client.getTrader(credentials.accountId);
+    });
+
+    console.log(`[Reconnect] ✅ New connection established successfully`);
+
+    return c.json({
+      success: true,
+      message: 'Connection re-established',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Reconnect] Error:', error);
+    return c.json(handleError(error, 'api/reconnect'), 500);
+  }
+});
+
+/**
  * POST /api/candles
  * Fetch historical candles (OHLCV data) via cTrader WebSocket
  */
@@ -691,6 +731,7 @@ app.notFound((c) => {
       'POST /api/positions',
       'POST /api/symbols',
       'POST /api/accounts',
+      'POST /api/reconnect',
       'POST /api/candles',
       'POST /api/quote',
       'POST /api/trade/market',
@@ -753,6 +794,7 @@ console.log('  POST /api/account          - Fetch account data');
 console.log('  POST /api/positions        - Fetch positions');
 console.log('  POST /api/symbols          - Fetch symbols');
 console.log('  POST /api/accounts         - List accounts');
+console.log('  POST /api/reconnect        - Force reconnect');
 console.log('  POST /api/candles          - Fetch historical candles');
 console.log('  POST /api/quote            - Get real-time quote');
 console.log('  POST /api/trade/market     - Place market order');

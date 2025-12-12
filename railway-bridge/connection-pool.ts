@@ -19,11 +19,13 @@ interface PooledConnection {
   credentials: CTraderCredentials;
   lastUsed: number;
   inUse: boolean;
+  createdAt: number; // Track when connection was created
 }
 
 export class ConnectionPool {
   private connections = new Map<string, PooledConnection>();
-  private maxIdleTime = 5 * 60 * 1000; // 5 minutes
+  private maxIdleTime = 5 * 60 * 1000; // 5 minutes (per cTrader documentation - DO NOT CHANGE)
+  private maxConnectionAge = 15 * 60 * 1000; // 15 minutes max age before forcing reconnect
   private cleanupInterval: number | null = null;
   private protoInitialized = false;
 
@@ -61,10 +63,17 @@ export class ConnectionPool {
     // Check if we have an existing connection that's not in use
     const existing = this.connections.get(key);
     if (existing && !existing.inUse) {
-      console.log(`[ConnectionPool] ♻️ Reusing existing connection: ${key}`);
-      existing.inUse = true;
-      existing.lastUsed = Date.now();
-      return existing.client;
+      // ✅ NEW: Check if connection is still healthy before reusing
+      if (existing.client.isHealthy()) {
+        console.log(`[ConnectionPool] ♻️ Reusing existing healthy connection: ${key}`);
+        existing.inUse = true;
+        existing.lastUsed = Date.now();
+        return existing.client;
+      } else {
+        console.log(`[ConnectionPool] ❌ Existing connection is unhealthy, creating a new one: ${key}`);
+        existing.client.disconnect();
+        this.connections.delete(key);
+      }
     }
     
     // If connection exists but is in use, create a fresh one
@@ -99,6 +108,7 @@ export class ConnectionPool {
         credentials,
         lastUsed: Date.now(),
         inUse: true,
+        createdAt: Date.now(),
       });
       
       return client;
@@ -231,12 +241,25 @@ export class ConnectionPool {
       let cleaned = 0;
       
       for (const [key, connection] of this.connections.entries()) {
-        // Remove connections idle for more than maxIdleTime
-        if (!connection.inUse && (now - connection.lastUsed) > this.maxIdleTime) {
+        let shouldRemove = false;
+        let reason = '';
+        
+        // Check if connection is too old
+        if ((now - connection.createdAt) > this.maxConnectionAge) {
+          shouldRemove = true;
+          reason = 'old connection (>15 min)';
+        }
+        // Check if connection has been idle too long
+        else if (!connection.inUse && (now - connection.lastUsed) > this.maxIdleTime) {
+          shouldRemove = true;
+          reason = 'idle connection (>5 min)';
+        }
+        
+        if (shouldRemove) {
           connection.client.disconnect();
           this.connections.delete(key);
           cleaned++;
-          console.log(`[ConnectionPool] 🧹 Cleaned idle connection: ${key}`);
+          console.log(`[ConnectionPool] 🧹 Cleaned ${reason}: ${key}`);
         }
       }
       
