@@ -197,33 +197,76 @@ app.post('/api/account', async (c) => {
     const credentials = validation.credentials!;
     console.log(`[Account] Fetching data for account ${credentials.accountId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
 
-    // Use connection pool to execute request
-    const traderData = await connectionPool.withConnection(credentials, async (client) => {
-      return await client.getTrader(credentials.accountId);
+    // ✅ CRITICAL FIX: Use PROTO_OA_RECONCILE_REQ to get BOTH balance AND equity
+    // PROTO_OA_TRADER_RES only returns balance, NOT equity
+    // PROTO_OA_RECONCILE_RES returns: positions, orders, AND live account state with equity
+    const reconcileData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getPositions(credentials.accountId);
     });
 
     console.log(`[Account] ✅ Success for account ${credentials.accountId}`);
-    console.log(`[Account] 📊 Trader data:`, {
-      hasTrader: !!traderData.trader,
-      balanceInCents: traderData.trader?.balance,
-      equityInCents: traderData.trader?.equity,
-      balance: traderData.trader?.balance ? traderData.trader.balance / 100 : 0,
-      equity: traderData.trader?.equity ? traderData.trader.equity / 100 : 0,
-    });
+    console.log(`[Account] 📊 Reconcile data keys:`, Object.keys(reconcileData));
+    console.log(`[Account] 📊 Full reconcile data:`, JSON.stringify(reconcileData, null, 2).substring(0, 500));
 
-    // cTrader response structure: { ctidTraderAccountId, trader: { balance, equity, ... } }
+    // cTrader PROTO_OA_RECONCILE_RES structure:
+    // { ctidTraderAccountId, position: [...], order: [...] }
     // ⚠️ CRITICAL: All monetary values in cTrader are in CENTS and must be divided by 100
-    const trader = traderData.trader || {};
+    
+    // ✅ FIX: Extract balance from reconcileData if available, otherwise fetch from getTrader()
+    let balanceValue = 0;
+    let equityValue = 0;
+    let freeMarginValue = 0;
+    let marginValue = 0;
+    
+    // Check if reconcile data contains account balance (it should)
+    // According to cTrader docs, reconcile might have balance in the response
+    if (reconcileData.balance) {
+      balanceValue = reconcileData.balance / 100;
+    }
+    
+    // Calculate equity from positions
+    // Equity = Balance + Sum of all unrealized P&L from positions
+    const positions = reconcileData.position || [];
+    let totalUnrealizedPnL = 0;
+    
+    for (const position of positions) {
+      // Each position has unrealizedGrossProfit or grossProfit field in cents
+      const pnl = position.grossProfit || position.unrealizedGrossProfit || 0;
+      totalUnrealizedPnL += pnl;
+    }
+    
+    // If reconcile didn't have balance, fetch it from getTrader()
+    if (balanceValue === 0) {
+      console.log(`[Account] ⚠️ Reconcile data missing balance, fetching from getTrader()...`);
+      const traderData = await connectionPool.withConnection(credentials, async (client) => {
+        return await client.getTrader(credentials.accountId);
+      });
+      
+      const trader = traderData.trader || {};
+      balanceValue = trader.balance ? trader.balance / 100 : 0;
+      freeMarginValue = trader.freeMargin ? trader.freeMargin / 100 : balanceValue;
+      marginValue = trader.margin ? trader.margin / 100 : 0;
+    }
+    
+    // Calculate equity = balance + unrealized P&L
+    equityValue = balanceValue + (totalUnrealizedPnL / 100);
+    
+    console.log(`[Account] 💰 Calculated values:`, {
+      balance: balanceValue,
+      equity: equityValue,
+      unrealizedPnL: totalUnrealizedPnL / 100,
+      openPositions: positions.length,
+    });
 
     return c.json({
       success: true,
       data: {
         accountId: credentials.accountId,
-        balance: trader.balance ? trader.balance / 100 : 0,
-        equity: trader.equity ? trader.equity / 100 : 0,
-        freeMargin: trader.freeMargin ? trader.freeMargin / 100 : 0,
-        margin: trader.margin ? trader.margin / 100 : 0,
-        leverage: trader.leverageInCents ? trader.leverageInCents / 100 : 1,
+        balance: balanceValue,
+        equity: equityValue,
+        freeMargin: freeMarginValue || balanceValue,
+        margin: marginValue,
+        leverage: 1, // TODO: Get from trader data
         currency: 'USD', // TODO: Get from trader data
         isDemo: credentials.isDemo,
         timestamp: new Date().toISOString(),
