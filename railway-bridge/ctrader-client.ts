@@ -263,7 +263,15 @@ export class CTraderClient {
       throw new Error('Connection closed - WebSocket not connected');
     }
     
-    if (!this.appAuthenticated) {
+    // ✅ CRITICAL FIX: Allow authentication messages through even when not authenticated
+    // This prevents the chicken-and-egg problem where auth messages are blocked because we're not authenticated yet
+    const isAuthMessage = 
+      payloadType === ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_REQ || // 2100 - App auth
+      payloadType === ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ ||     // 2102 - Account auth
+      payloadType === ProtoOAPayloadType.PROTO_OA_VERSION_REQ;            // 2104 - Version check
+    
+    // Only enforce authentication for non-auth messages
+    if (!this.appAuthenticated && !isAuthMessage) {
       throw new Error('Connection closed - Not authenticated');
     }
 
