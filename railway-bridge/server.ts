@@ -359,6 +359,65 @@ app.post('/api/symbols', async (c) => {
 });
 
 /**
+ * POST /api/symbol-lookup
+ * Convert symbol name to symbolId (e.g., "EURUSD" -> 1)
+ * This is much more efficient than fetching all symbols
+ */
+app.post('/api/symbol-lookup', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbolName } = body;
+    if (!symbolName) {
+      return c.json({ error: 'symbolName is required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    console.log(`[Symbol Lookup] Looking up "${symbolName}" for account ${credentials.accountId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+
+    // Use connection pool to execute request
+    const symbolsData = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getSymbols(credentials.accountId);
+    });
+
+    const symbols = symbolsData.symbol || [];
+    console.log(`[Symbol Lookup] Searching ${symbols.length} symbols for "${symbolName}"`);
+
+    // Find symbol by name
+    const symbol = symbols.find((s: any) => s.symbolName === symbolName);
+    
+    if (!symbol) {
+      console.error(`[Symbol Lookup] ❌ Symbol "${symbolName}" not found`);
+      return c.json({ 
+        error: `Symbol "${symbolName}" not found`,
+        availableSymbols: symbols.slice(0, 10).map((s: any) => s.symbolName), // Show first 10 as examples
+      }, 404);
+    }
+
+    console.log(`[Symbol Lookup] ✅ Found symbolId: ${symbol.symbolId} for ${symbolName}`);
+
+    return c.json({
+      success: true,
+      data: {
+        symbolId: symbol.symbolId,
+        symbolName: symbol.symbolName,
+        description: symbol.description,
+        digits: symbol.digits,
+        pipPosition: symbol.pipPosition,
+      },
+    });
+  } catch (error) {
+    console.error('[Symbol Lookup] Error:', error);
+    return c.json(handleError(error, 'api/symbol-lookup'), 500);
+  }
+});
+
+/**
  * POST /api/accounts
  * Get all accounts for an access token
  */
@@ -773,6 +832,7 @@ app.notFound((c) => {
       'POST /api/account',
       'POST /api/positions',
       'POST /api/symbols',
+      'POST /api/symbol-lookup',
       'POST /api/accounts',
       'POST /api/reconnect',
       'POST /api/candles',
@@ -836,6 +896,7 @@ console.log('  GET  /stats                - Connection pool stats');
 console.log('  POST /api/account          - Fetch account data');
 console.log('  POST /api/positions        - Fetch positions');
 console.log('  POST /api/symbols          - Fetch symbols');
+console.log('  POST /api/symbol-lookup    - Lookup symbolId by name');
 console.log('  POST /api/accounts         - List accounts');
 console.log('  POST /api/reconnect        - Force reconnect');
 console.log('  POST /api/candles          - Fetch historical candles');
