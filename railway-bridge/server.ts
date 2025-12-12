@@ -560,26 +560,26 @@ app.post('/api/quote', async (c) => {
       return c.json({ error: validation.error }, 400);
     }
 
-    const { symbol } = body;
+    const { symbolId } = body;
     
-    if (!symbol) {
-      return c.json({ error: 'symbol is required' }, 400);
+    if (!symbolId) {
+      return c.json({ error: 'symbolId is required' }, 400);
     }
 
     const credentials = validation.credentials!;
-    console.log(`[Quote] Fetching quote for ${symbol} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+    console.log(`[Quote] Fetching quote for symbolId=${symbolId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
 
     // Subscribe to spot event and get latest price
     const quoteData = await connectionPool.withConnection(credentials, async (client) => {
-      return await client.subscribeToSpotEvent(credentials.accountId, symbol);
+      return await client.subscribeToSpotEvent(credentials.accountId, symbolId);
     });
 
-    console.log(`[Quote] ✅ Success for ${symbol}`);
+    console.log(`[Quote] ✅ Success for symbolId=${symbolId}`);
 
     return c.json({
       success: true,
       data: {
-        symbol,
+        symbolId,
         bid: quoteData.bid || 0,
         ask: quoteData.ask || 0,
         timestamp: new Date().toISOString(),
@@ -604,20 +604,20 @@ app.post('/api/trade/market', async (c) => {
       return c.json({ error: validation.error }, 400);
     }
 
-    const { symbol, volume, side, stopLoss, takeProfit } = body;
+    const { symbolId, volume, side, stopLoss, takeProfit } = body;
     
-    if (!symbol || !volume || !side) {
-      return c.json({ error: 'symbol, volume, and side are required' }, 400);
+    if (!symbolId || !volume || !side) {
+      return c.json({ error: 'symbolId, volume, and side are required' }, 400);
     }
 
     const credentials = validation.credentials!;
-    console.log(`[Trade] Placing market ${side} order: ${symbol} ${volume} lots (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+    console.log(`[Trade] Placing market ${side} order: symbolId=${symbolId} ${volume} lots (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
 
     // Use connection pool to execute request
     const orderData = await connectionPool.withConnection(credentials, async (client) => {
       return await client.placeMarketOrder({
         accountId: credentials.accountId,
-        symbol,
+        symbolId,
         volume: volume * 100, // Convert to centiLots
         tradeSide: side === 'BUY' ? 'BUY' : 'SELL',
         stopLoss,

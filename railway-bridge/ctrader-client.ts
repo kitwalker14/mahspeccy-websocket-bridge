@@ -559,7 +559,7 @@ export class CTraderClient {
    */
   async placeMarketOrder(params: {
     accountId: string;
-    symbol: string;
+    symbolId: number; // ✅ Changed from symbol (string) to symbolId (number)
     volume: number;
     tradeSide: 'BUY' | 'SELL';
     stopLoss?: number;
@@ -567,9 +567,9 @@ export class CTraderClient {
   }): Promise<any> {
     console.log('[CTraderClient] 📊 placeMarketOrder called:', params);
     
-    // Get symbol ID
-    const symbolId = await this.getSymbolId(params.accountId, params.symbol);
-    console.log(`[CTraderClient] ✅ Symbol ID for ${params.symbol}: ${symbolId}`);
+    // ✅ symbolId is now passed directly from server.ts, no need to lookup
+    const symbolId = params.symbolId;
+    console.log(`[CTraderClient] ✅ Using symbolId: ${symbolId}`);
     
     // Build request
     const request: NewOrderReq = {
@@ -732,15 +732,13 @@ export class CTraderClient {
   /**
    * Subscribe to spot events (real-time quotes)
    */
-  async subscribeToSpotEvent(accountId: string, symbol: string): Promise<any> {
-    console.log('[CTraderClient] 📊 subscribeToSpotEvent called');
+  async subscribeToSpotEvent(accountId: string, symbolId: number): Promise<any> {
+    console.log(`[CTraderClient] 📊 subscribeToSpotEvent called for symbolId=${symbolId}`);
     
-    // Get symbol ID
-    const symbolId = await this.getSymbolId(accountId, symbol);
-    
+    // ✅ symbolId is now passed directly, no need to lookup
     const request = {
       ctidTraderAccountId: parseInt(accountId),
-      symbolId: [symbolId],
+      symbolId: [symbolId], // cTrader expects array of symbolIds
     };
     
     const response = await this.sendRequest(
