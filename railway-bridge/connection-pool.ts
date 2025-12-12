@@ -157,12 +157,21 @@ export class ConnectionPool {
     callback: (client: CTraderClient) => Promise<T>,
     skipAccountAuth = false
   ): Promise<T> {
-    const maxRetries = 2; // Try up to 2 times (initial + 1 retry)
+    const maxRetries = 3; // ✅ Increased from 2 to 3 retries
     let lastError: Error | null = null;
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const client = await this.getConnection(credentials, skipAccountAuth);
+        
+        // ✅ CRITICAL FIX: Double-check connection health right before using it
+        // This catches connections that closed between getConnection() and callback()
+        if (!client.isHealthy()) {
+          console.log(`[ConnectionPool] ⚠️ Connection became unhealthy before use, forcing reconnect...`);
+          client.disconnect();
+          this.connections.delete(this.getKey(credentials));
+          continue; // Retry
+        }
         
         try {
           const result = await callback(client);

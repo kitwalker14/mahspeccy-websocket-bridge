@@ -258,8 +258,13 @@ export class CTraderClient {
    * Send request and wait for response
    */
   private async sendRequest<T>(payloadType: number, payload: any, timeoutMs = 30000): Promise<T> {
+    // ✅ Enhanced health check - verify WebSocket is actually connected and authenticated
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket not connected');
+      throw new Error('Connection closed - WebSocket not connected');
+    }
+    
+    if (!this.appAuthenticated) {
+      throw new Error('Connection closed - Not authenticated');
     }
 
     return new Promise((resolve, reject) => {
