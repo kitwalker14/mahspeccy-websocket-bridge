@@ -112,17 +112,19 @@ export class CTraderClient {
 
         this.ws.onclose = (event: CloseEvent) => {
           clearTimeout(timeout);
-          const stack = new Error().stack; // Capture stack trace to see WHO closed the connection
-          console.log(`[CTraderClient] 🔌 WebSocket closed ${connectionEstablished ? 'after connection' : 'during connection'}`);
-          console.log(`[CTraderClient] Code: ${event.code}, Reason: ${event.reason || 'No reason provided'}`);
-          console.log(`[CTraderClient] Was clean: ${event.wasClean}`);
-          console.log(`[CTraderClient] 📍 Close event stack trace:`, stack);
-          console.log(`[CTraderClient] 📊 Auth status - App: ${this.appAuthenticated}, Account: ${this.accountAuthenticated}`);
-          console.log(`[CTraderClient] 📋 Subscribed symbols: ${Array.from(this.subscribedSymbols).join(', ') || 'none'}`);
-          console.log(`[CTraderClient] 💾 Cached quotes: ${Array.from(this.spotCache.keys()).join(', ') || 'none'}`);
-          this.stopHeartbeat();
-          this.appAuthenticated = false;
-          this.accountAuthenticated = false;
+          console.log(`[CTraderClient] 🔌 WebSocket closed (code: ${event.code}, reason: ${event.reason || 'none'}, clean: ${event.wasClean})`);
+          
+          // ✅ CRITICAL: Log detailed close information for debugging
+          console.error(`[CTraderClient] ❌ ========== WEBSOCKET CLOSED ==========`);
+          console.error(`[CTraderClient] Close Code: ${event.code}`);
+          console.error(`[CTraderClient] Close Reason: ${event.reason || 'No reason provided'}`);
+          console.error(`[CTraderClient] Was Clean: ${event.wasClean}`);
+          console.error(`[CTraderClient] Authenticated: app=${this.appAuthenticated}, account=${this.accountAuthenticated}`);
+          console.error(`[CTraderClient] Subscribed Symbols: [${Array.from(this.subscribedSymbols).join(', ')}]`);
+          console.error(`[CTraderClient] Pending Requests: ${this.pendingRequests.size}`);
+          console.error(`[CTraderClient] ❌ ========== WEBSOCKET CLOSED END ==========`);
+          
+          this.cleanup();
           
           // If connection not yet established, reject the connection promise
           if (!connectionEstablished) {
@@ -169,6 +171,16 @@ export class CTraderClient {
   private cleanup(): void {
     this.appAuthenticated = false;
     this.accountAuthenticated = false;
+    
+    // ✅ CRITICAL FIX: Clear subscription tracking when connection closes
+    // This prevents stale subscription state from causing ALREADY_SUBSCRIBED errors on reconnection
+    console.log(`[CTraderClient] 🧹 Clearing ${this.subscribedSymbols.size} subscribed symbols`);
+    this.subscribedSymbols.clear();
+    
+    // ✅ CRITICAL FIX: Clear spot cache when connection closes
+    // Old cached data is no longer valid after reconnection
+    console.log(`[CTraderClient] 🧹 Clearing ${this.spotCache.size} cached spot prices`);
+    this.spotCache.clear();
     
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
@@ -651,100 +663,9 @@ export class CTraderClient {
     await this.authenticateAccount(credentials.accountId, credentials.accessToken);
     console.log('[CTraderClient] ✅ Step 2 Complete: Account authenticated');
     
-    // ✅ PHASE 2 FIX: Proper subscription flow per cTrader documentation
-    // Documentation: "You'll receive technical ProtoOASpotEvent with current price shortly after this response"
-    console.log('[CTraderClient] 📝 Step 3: Proactive Spot Subscription (with proper wait for technical event)...');
-    console.log('[CTraderClient] 🔔 Subscribing to common symbols with PROPER FLOW...');
+    // ✅ REMOVED: Proactive subscription during auth causes race conditions
+    // Subscriptions will be handled on-demand by subscribeToSpotEvent() when needed
     
-    // Subscribe to major forex pairs that are commonly queried
-    const commonSymbols = [1]; // symbolId 1 = EURUSD (most commonly used)
-    
-    for (const symbolId of commonSymbols) {
-      if (!this.subscribedSymbols.has(symbolId)) {
-        try {
-          console.log(`[CTraderClient] ========== SPOT SUBSCRIPTION FLOW: Symbol ${symbolId} ==========`);
-          
-          // ✅ PHASE 2: Step 3a - Send ProtoOASubscribeSpotsReq
-          const request = {
-            ctidTraderAccountId: parseInt(credentials.accountId),
-            symbolId: [symbolId],
-          };
-          
-          console.log(`[CTraderClient] 📤 Step 3a: Sending PROTO_OA_SUBSCRIBE_SPOTS_REQ for symbolId=${symbolId}...`);
-          
-          const subscribeResponse = await this.sendRequest(
-            ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
-            request,
-            30000
-          );
-          
-          console.log(`[CTraderClient] ✅ Step 3a Complete: Received PROTO_OA_SUBSCRIBE_SPOTS_RES`);
-          console.log(`[CTraderClient] 📋 Response:`, JSON.stringify(subscribeResponse, null, 2));
-          console.log(`[CTraderClient] 📚 Per cTrader docs: "Request to subscribe for symbol has been added to queue"`);
-          
-          // ✅ Track this symbol as subscribed IMMEDIATELY after receiving response
-          // This prevents duplicate subscriptions while waiting for technical event
-          this.subscribedSymbols.add(symbolId);
-          console.log(`[CTraderClient] ✅ Symbol ${symbolId} marked as subscribed (awaiting technical event)`);
-          
-          // ✅ PHASE 2: Step 3b - Wait for FIRST technical ProtoOASpotEvent
-          // Documentation: "You'll receive technical ProtoOASpotEvent with current price shortly after this response"
-          console.log(`[CTraderClient] 📝 Step 3b: Waiting for FIRST technical ProtoOASpotEvent...`);
-          console.log(`[CTraderClient] 📚 Per cTrader docs: "First event received after subscription will contain latest spot prices even if market is closed"`);
-          
-          const maxWait = 10000; // 10 seconds for technical event (increased from 5s)
-          const start = Date.now();
-          let eventReceived = false;
-          
-          while (Date.now() - start < maxWait) {
-            // ✅ Check connection health during wait
-            if (!this.ws || this.ws.readyState !== 1) {
-              const error = new Error('WebSocket connection lost while waiting for technical spot event');
-              console.error(`[CTraderClient] ❌ CRITICAL: ${error.message}`);
-              console.error(`[CTraderClient] ❌ Connection state: ${this.ws?.readyState}`);
-              console.error(`[CTraderClient] ❌ This indicates the connection closed during subscription queue processing`);
-              throw error;
-            }
-            
-            // Check if technical event arrived
-            if (this.spotCache.has(symbolId)) {
-              const cached = this.spotCache.get(symbolId)!;
-              console.log(`[CTraderClient] ✅ Step 3b Complete: Technical ProtoOASpotEvent received!`);
-              console.log(`[CTraderClient] 💰 Initial quote: bid=${cached.bid}, ask=${cached.ask}`);
-              console.log(`[CTraderClient] ⏱️  Wait time: ${Date.now() - start}ms`);
-              eventReceived = true;
-              break;
-            }
-            
-            // Wait 100ms before checking again
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-          
-          if (!eventReceived) {
-            console.warn(`[CTraderClient] ⚠️ WARNING: No technical spot event received after ${maxWait}ms for symbolId=${symbolId}`);
-            console.warn(`[CTraderClient] ⚠️ This may indicate:`);
-            console.warn(`[CTraderClient] ⚠️ 1. Market is closed and cTrader is not sending events`);
-            console.warn(`[CTraderClient] ⚠️ 2. Connection is slow or congested`);
-            console.warn(`[CTraderClient] ⚠️ 3. Subscription queue processing is delayed`);
-            console.warn(`[CTraderClient] ⚠️ Connection state: ${this.ws?.readyState} (1=OPEN)`);
-          }
-          
-          console.log(`[CTraderClient] ========== SPOT SUBSCRIPTION FLOW COMPLETE ==========`);
-        } catch (error) {
-          console.error(`[CTraderClient] ❌ Spot subscription failed for symbolId=${symbolId}:`, error);
-          console.error(`[CTraderClient] ❌ Error type:`, error.constructor.name);
-          console.error(`[CTraderClient] ❌ Error message:`, error.message);
-          console.error(`[CTraderClient] ❌ Stack:`, error.stack);
-          // Don't throw - continue with other subscriptions
-        }
-      } else {
-        console.log(`[CTraderClient] ⚡ Symbol ${symbolId} already subscribed, skipping`);
-      }
-    }
-    
-    console.log('[CTraderClient] ✅ Step 3 Complete: Proactive subscriptions finished');
-    console.log('[CTraderClient] 📊 Subscribed symbols:', Array.from(this.subscribedSymbols));
-    console.log('[CTraderClient] 📊 Cached quotes:', Array.from(this.spotCache.keys()));
     console.log('[CTraderClient] ========== FULL AUTHENTICATION FLOW COMPLETE ==========');
   }
 
@@ -1017,11 +938,13 @@ export class CTraderClient {
     
     console.log(`[CTraderClient] 📤 Sending PROTO_OA_SUBSCRIBE_SPOTS_REQ for symbolId=${symbolId}`);
     
-    await this.sendRequest(
+    const subscribeResponse = await this.sendRequest(
       ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ,
       request,
       30000
     );
+    
+    console.log(`[CTraderClient] ✅ PROTO_OA_SUBSCRIBE_SPOTS_RES received:`, JSON.stringify(subscribeResponse, null, 2));
     
     // ✅ Track this symbol as subscribed
     this.subscribedSymbols.add(symbolId);
