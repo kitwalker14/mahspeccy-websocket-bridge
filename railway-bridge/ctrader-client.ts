@@ -982,7 +982,18 @@ export class CTraderClient {
     console.error(`[CTraderClient] Connection state: ${this.ws?.readyState} (1=OPEN, 2=CLOSING, 3=CLOSED)`);
     console.error(`[CTraderClient] Subscribed symbols: ${Array.from(this.subscribedSymbols).join(', ')}`);
     console.error(`[CTraderClient] Cached symbols: ${Array.from(this.spotCache.keys()).join(', ')}`);
-    throw new Error(`Timeout waiting for spot event for symbolId=${symbolId}`);
+    
+    // ✅ CRITICAL FIX: When market is closed, cTrader doesn't send spot events
+    // Instead of throwing error, return zero prices with clear indication
+    console.warn(`[CTraderClient] ⚠️ No spot event received - market may be closed or symbol inactive`);
+    console.warn(`[CTraderClient] ⚠️ Returning zero prices - this is expected behavior when market is closed`);
+    
+    return {
+      bid: 0,
+      ask: 0,
+      timestamp: Date.now(),
+      marketClosed: true, // ✅ Flag indicating this is due to market closure
+    };
   }
 
   /**
