@@ -198,15 +198,10 @@ export class CTraderClient {
     this.appAuthenticated = false;
     this.accountAuthenticated = false;
     
-    // ✅ CRITICAL FIX: Clear subscription tracking when connection closes
-    // This prevents stale subscription state from causing ALREADY_SUBSCRIBED errors on reconnection
-    console.log(`[CTraderClient] 🧹 Clearing ${this.subscribedSymbols.size} subscribed symbols`);
-    this.subscribedSymbols.clear();
-    
-    // ✅ CRITICAL FIX: Clear spot cache when connection closes
-    // Old cached data is no longer valid after reconnection
-    console.log(`[CTraderClient] 🧹 Clearing ${this.spotCache.size} cached spot prices`);
-    this.spotCache.clear();
+    // ✅ DO NOT CLEAR GLOBAL CACHE - it's shared across all client instances!
+    // The global cache should persist even when individual connections close.
+    // Subscriptions will be re-established automatically when needed.
+    console.log(`[CTraderClient] 🧹 Cleanup - keeping ${this.subscribedSymbols.size} subscriptions and ${this.spotCache.size} cached prices in global cache`);
     
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
