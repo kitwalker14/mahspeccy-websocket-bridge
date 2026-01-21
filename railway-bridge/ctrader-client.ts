@@ -32,6 +32,15 @@ export interface CTraderCredentials {
   isDemo: boolean;
 }
 
+// ✅ CRITICAL FIX: Make spot cache GLOBAL so it's shared across all client instances
+// This fixes the issue where spot events on Client A are not visible to Client B
+const globalSpotCache = new Map<string, Map<number, { bid: number; ask: number; timestamp: number }>>();
+const globalSubscribedSymbols = new Map<string, Set<number>>();
+
+function getGlobalCacheKey(isDemo: boolean, accountId: string): string {
+  return `${isDemo ? 'demo' : 'live'}_${accountId}`;
+}
+
 export class CTraderClient {
   private ws: WebSocket | null = null;
   private host: string;
@@ -47,13 +56,30 @@ export class CTraderClient {
   private heartbeatInterval: number | null = null;
   private lastActivityTimestamp = 0; // ✅ PHASE 3: Track last message activity for smart heartbeat
   private accessToken: string;
-  private subscribedSymbols = new Set<number>(); // ✅ Track subscribed symbols to avoid ALREADY_SUBSCRIBED error
-  private spotCache = new Map<number, { bid: number; ask: number; timestamp: number }>(); // ✅ Cache latest spot events
+  private cacheKey: string; // ✅ Key for global cache
   private symbolMetadata = new Map<number, { digits: number; name: string }>(); // ✅ Cache symbol metadata for price transformation
 
-  constructor(isDemo: boolean) {
+  constructor(isDemo: boolean, accountId?: string) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
     this.port = 5035;
+    this.cacheKey = getGlobalCacheKey(isDemo, accountId || 'unknown');
+    
+    // ✅ Initialize global cache for this account if it doesn't exist
+    if (!globalSpotCache.has(this.cacheKey)) {
+      globalSpotCache.set(this.cacheKey, new Map());
+    }
+    if (!globalSubscribedSymbols.has(this.cacheKey)) {
+      globalSubscribedSymbols.set(this.cacheKey, new Set());
+    }
+  }
+  
+  // ✅ Helper methods to access global cache
+  private get spotCache(): Map<number, { bid: number; ask: number; timestamp: number }> {
+    return globalSpotCache.get(this.cacheKey)!;
+  }
+  
+  private get subscribedSymbols(): Set<number> {
+    return globalSubscribedSymbols.get(this.cacheKey)!;
   }
 
   /**
@@ -903,24 +929,25 @@ export class CTraderClient {
       throw new Error('WebSocket not connected - cannot subscribe to spot events');
     }
     
-    // ✅ Check if we already have cached data (already subscribed)
+    // ✅ CRITICAL FIX: Check cache FIRST, regardless of subscription tracking
+    // This handles the case where subscription tracking was cleared but cTrader still has the subscription active
+    const cachedQuote = this.spotCache.get(symbolId);
+    if (cachedQuote && cachedQuote.bid > 0 && cachedQuote.ask > 0) {
+      console.log(`[CTraderClient] ⚡ CACHE HIT - Returning cached quote: bid=${cachedQuote.bid}, ask=${cachedQuote.ask}`);
+      return {
+        bid: cachedQuote.bid,
+        ask: cachedQuote.ask,
+        timestamp: cachedQuote.timestamp,
+      };
+    }
+    
+    // ✅ Check if we're tracking this symbol as subscribed
     if (this.subscribedSymbols.has(symbolId)) {
-      console.log(`[CTraderClient] ⚡ Symbol ${symbolId} already subscribed`);
+      console.log(`[CTraderClient] ⚡ Symbol ${symbolId} marked as subscribed, but no cache yet`);
       
-      // Return cached data if available
-      const cached = this.spotCache.get(symbolId);
-      if (cached) {
-        console.log(`[CTraderClient] ✅ Returning cached quote: bid=${cached.bid}, ask=${cached.ask}`);
-        return {
-          bid: cached.bid,
-          ask: cached.ask,
-          timestamp: cached.timestamp,
-        };
-      }
-      
-      // ✅ CRITICAL FIX: If subscribed but no cache, wait for next spot event WITHOUT re-subscribing
+      // ✅ CRITICAL FIX: Wait for spot event WITHOUT re-subscribing
       // Re-subscribing causes ALREADY_SUBSCRIBED error and connection closure
-      console.log(`[CTraderClient] ⏳ Already subscribed to ${symbolId}, waiting for next spot event...`);
+      console.log(`[CTraderClient] ⏳ Waiting for next spot event for ${symbolId}...`);
       
       const maxWait = 5000; // 5 seconds for already-subscribed symbol
       const start = Date.now();
@@ -931,7 +958,7 @@ export class CTraderClient {
         }
         
         const cached = this.spotCache.get(symbolId);
-        if (cached) {
+        if (cached && cached.bid > 0 && cached.ask > 0) {
           console.log(`[CTraderClient] ✅ Spot event received! bid=${cached.bid}, ask=${cached.ask}`);
           return {
             bid: cached.bid,
@@ -997,7 +1024,7 @@ export class CTraderClient {
       }
       
       const cached = this.spotCache.get(symbolId);
-      if (cached) {
+      if (cached && cached.bid > 0 && cached.ask > 0) {
         console.log(`[CTraderClient] ✅ Spot event received! bid=${cached.bid}, ask=${cached.ask}`);
         return {
           bid: cached.bid,

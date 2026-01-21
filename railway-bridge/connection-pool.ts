@@ -84,7 +84,7 @@ export class ConnectionPool {
       this.connections.delete(key);
     }
     
-    const client = new CTraderClient(credentials.isDemo);
+    const client = new CTraderClient(credentials.isDemo, credentials.accountId);
     
     try {
       // CRITICAL: Initialize proto files for this client instance
