@@ -234,6 +234,26 @@ export class CTraderClient {
   }
 
   /**
+   * ✅ NEW: Send manual heartbeat (for use during long waits)
+   * This keeps the connection alive when waiting for spot events
+   */
+  private async sendManualHeartbeat(): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn(`[CTraderClient] ⚠️ Cannot send manual heartbeat - WebSocket not open (state: ${this.ws?.readyState})`);
+      return;
+    }
+    
+    try {
+      const heartbeat = this.encodeMessage(ProtoOAPayloadType.HEARTBEAT_EVENT, {});
+      this.ws.send(heartbeat);
+      console.log(`[CTraderClient] 💓 Manual heartbeat sent during wait`);
+    } catch (error) {
+      console.warn(`[CTraderClient] ⚠️ Manual heartbeat failed:`, error);
+      // Don't throw - this is non-critical
+    }
+  }
+
+  /**
    * Handle incoming message
    */
   private handleMessage(data: ArrayBuffer): void {
@@ -956,11 +976,24 @@ export class CTraderClient {
     
     const maxWait = 10000; // ✅ Increased to 10 seconds (was 5s)
     const start = Date.now();
+    let lastHeartbeat = Date.now(); // ✅ NEW: Track last heartbeat
     
     while (Date.now() - start < maxWait) {
+      // ✅ NEW: Send heartbeat every 3 seconds to keep connection alive
+      if (Date.now() - lastHeartbeat > 3000) {
+        console.log(`[CTraderClient] 💓 Sending heartbeat during spot wait (elapsed: ${Date.now() - start}ms)...`);
+        await this.sendManualHeartbeat();
+        lastHeartbeat = Date.now();
+      }
+      
       // ✅ Check if connection is still alive
       if (!this.ws || this.ws.readyState !== 1) {
-        throw new Error('WebSocket connection lost while waiting for spot event');
+        console.error(`[CTraderClient] ❌ WebSocket disconnected during spot wait`);
+        console.error(`[CTraderClient] State: ${this.ws?.readyState} (1=OPEN, 2=CLOSING, 3=CLOSED)`);
+        console.error(`[CTraderClient] Time elapsed: ${Date.now() - start}ms / ${maxWait}ms`);
+        console.error(`[CTraderClient] Subscribed symbols: ${Array.from(this.subscribedSymbols).join(', ')}`);
+        console.error(`[CTraderClient] Spot cache size: ${this.spotCache.size}`);
+        throw new Error(`WebSocket connection lost while waiting for spot event (state=${this.ws?.readyState}, elapsed=${Date.now() - start}ms)`);
       }
       
       const cached = this.spotCache.get(symbolId);
