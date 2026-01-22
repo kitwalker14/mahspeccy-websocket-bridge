@@ -554,6 +554,7 @@ app.post('/api/candles', async (c) => {
 /**
  * POST /api/quote
  * Get real-time quote for a symbol
+ * Accepts either symbolId (number) or symbol (string, e.g. "EURUSD")
  */
 app.post('/api/quote', async (c) => {
   const startTime = Date.now();
@@ -570,15 +571,26 @@ app.post('/api/quote', async (c) => {
       return c.json({ error: validation.error }, 400);
     }
 
-    const { symbolId } = body;
+    let { symbolId, symbol } = body;
+    const credentials = validation.credentials!;
+    
+    console.log(`[Quote] ✅ Validation passed`);
+    
+    // If symbol name provided but no ID, look it up
+    if (!symbolId && symbol) {
+      console.log(`[Quote] 🔍 Looking up symbol ID for "${symbol}"...`);
+      // We need a client instance to look up the symbol
+      symbolId = await connectionPool.withConnection(credentials, async (client) => {
+        return await client.getSymbolId(credentials.accountId, symbol);
+      });
+      console.log(`[Quote] ✅ Resolved "${symbol}" to ID: ${symbolId}`);
+    }
     
     if (!symbolId) {
-      console.error(`[Quote] ❌ Missing symbolId in request`);
-      return c.json({ error: 'symbolId is required' }, 400);
+      console.error(`[Quote] ❌ Missing symbolId or valid symbol name in request`);
+      return c.json({ error: 'symbolId or valid symbol name is required' }, 400);
     }
 
-    const credentials = validation.credentials!;
-    console.log(`[Quote] ✅ Validation passed`);
     console.log(`[Quote] 📊 Fetching quote for symbolId=${symbolId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
     console.log(`[Quote] 🔑 Account: ${credentials.accountId}`);
     console.log(`[Quote] ⏱️  Start time: ${startTime}ms`);
@@ -587,7 +599,7 @@ app.post('/api/quote', async (c) => {
     console.log(`[Quote] 🔄 Calling connectionPool.withConnection...`);
     const quoteData = await connectionPool.withConnection(credentials, async (client) => {
       console.log(`[Quote] 📡 Inside connection callback - calling subscribeToSpotEvent...`);
-      const result = await client.subscribeToSpotEvent(credentials.accountId, parseInt(symbolId));
+      const result = await client.subscribeToSpotEvent(credentials.accountId, parseInt(symbolId.toString()));
       console.log(`[Quote] ✅ subscribeToSpotEvent returned:`, result);
       return result;
     });
@@ -601,6 +613,7 @@ app.post('/api/quote', async (c) => {
       success: true,
       data: {
         symbolId,
+        symbol: symbol || 'Unknown', // Return back the name if we have it
         bid: quoteData.bid || 0,
         ask: quoteData.ask || 0,
         timestamp: new Date().toISOString(),
