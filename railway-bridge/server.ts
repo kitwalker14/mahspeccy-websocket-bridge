@@ -561,29 +561,46 @@ app.post('/api/candles', async (c) => {
  * Get real-time quote for a symbol
  */
 app.post('/api/quote', async (c) => {
+  const startTime = Date.now();
+  console.log(`[Quote] ========== QUOTE REQUEST START (${new Date().toISOString()}) ==========`);
+  
   try {
     const body = await c.req.json();
+    console.log(`[Quote] 📦 Request body:`, JSON.stringify(body, null, 2));
+    
     const validation = validateRequest(body);
     
     if (!validation.valid) {
+      console.error(`[Quote] ❌ Validation failed:`, validation.error);
       return c.json({ error: validation.error }, 400);
     }
 
     const { symbolId } = body;
     
     if (!symbolId) {
+      console.error(`[Quote] ❌ Missing symbolId in request`);
       return c.json({ error: 'symbolId is required' }, 400);
     }
 
     const credentials = validation.credentials!;
-    console.log(`[Quote] Fetching quote for symbolId=${symbolId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+    console.log(`[Quote] ✅ Validation passed`);
+    console.log(`[Quote] 📊 Fetching quote for symbolId=${symbolId} (${credentials.isDemo ? 'DEMO' : 'LIVE'})`);
+    console.log(`[Quote] 🔑 Account: ${credentials.accountId}`);
+    console.log(`[Quote] ⏱️  Start time: ${startTime}ms`);
 
     // Subscribe to spot event and get latest price
+    console.log(`[Quote] 🔄 Calling connectionPool.withConnection...`);
     const quoteData = await connectionPool.withConnection(credentials, async (client) => {
-      return await client.subscribeToSpotEvent(credentials.accountId, parseInt(symbolId)); // ✅ Parse symbolId as integer
+      console.log(`[Quote] 📡 Inside connection callback - calling subscribeToSpotEvent...`);
+      const result = await client.subscribeToSpotEvent(credentials.accountId, parseInt(symbolId));
+      console.log(`[Quote] ✅ subscribeToSpotEvent returned:`, result);
+      return result;
     });
 
-    console.log(`[Quote] ✅ Success for symbolId=${symbolId}`);
+    const elapsedTime = Date.now() - startTime;
+    console.log(`[Quote] ✅ Success for symbolId=${symbolId} (${elapsedTime}ms)`);
+    console.log(`[Quote] 💰 Quote data:`, JSON.stringify(quoteData, null, 2));
+    console.log(`[Quote] ========== QUOTE REQUEST END ==========\n`);
 
     return c.json({
       success: true,
@@ -592,10 +609,18 @@ app.post('/api/quote', async (c) => {
         bid: quoteData.bid || 0,
         ask: quoteData.ask || 0,
         timestamp: new Date().toISOString(),
+        marketClosed: quoteData.marketClosed || false,
+        elapsedMs: elapsedTime,
       },
     });
   } catch (error) {
-    console.error('[Quote] Error:', error);
+    const elapsedTime = Date.now() - startTime;
+    console.error(`[Quote] ❌ ========== ERROR (${elapsedTime}ms) ==========`);
+    console.error(`[Quote] ❌ Error type:`, error?.constructor?.name);
+    console.error(`[Quote] ❌ Error message:`, error?.message);
+    console.error(`[Quote] ❌ Error stack:`, error?.stack);
+    console.error(`[Quote] ❌ Full error object:`, JSON.stringify(error, null, 2));
+    console.error(`[Quote] ❌ ========== ERROR END ==========\n`);
     return c.json(handleError(error, 'api/quote'), 500);
   }
 });

@@ -55,7 +55,7 @@ export class CTraderClient {
   }>();
   private heartbeatInterval: number | null = null;
   private lastActivityTimestamp = 0; // ✅ PHASE 3: Track last message activity for smart heartbeat
-  private accessToken: string;
+  private accessToken: string = ''; // ✅ Initialize with empty string
   private cacheKey: string; // ✅ Key for global cache
   private symbolMetadata = new Map<number, { digits: number; name: string }>(); // ✅ Cache symbol metadata for price transformation
 
