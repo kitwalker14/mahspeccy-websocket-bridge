@@ -1025,6 +1025,20 @@ export class CTraderClient {
         console.error(`[CTraderClient] Time elapsed: ${Date.now() - start}ms / ${maxWait}ms`);
         console.error(`[CTraderClient] Subscribed symbols: ${Array.from(this.subscribedSymbols).join(', ')}`);
         console.error(`[CTraderClient] Spot cache size: ${this.spotCache.size}`);
+        
+        // ⚠️ CRITICAL FIX: If we have cached data, return it instead of throwing
+        // This handles cases where connection drops briefly but we already have data
+        const cached = this.spotCache.get(symbolId);
+        if (cached && (cached.bid > 0 || cached.ask > 0)) {
+           console.log(`[CTraderClient] ⚠️ Connection lost, but returning cached quote: bid=${cached.bid}, ask=${cached.ask}`);
+           return {
+             bid: cached.bid,
+             ask: cached.ask,
+             timestamp: cached.timestamp,
+             _connectionLost: true,
+           };
+        }
+
         throw new Error(`WebSocket connection lost while waiting for spot event (state=${this.ws?.readyState}, elapsed=${Date.now() - start}ms)`);
       }
       
@@ -1048,6 +1062,18 @@ export class CTraderClient {
     console.error(`[CTraderClient] Subscribed symbols: ${Array.from(this.subscribedSymbols).join(', ')}`);
     console.error(`[CTraderClient] Cached symbols: ${Array.from(this.spotCache.keys()).join(', ')}`);
     
+    // ⚠️ CRITICAL FIX: Return last known data if available, even on timeout
+    const cached = this.spotCache.get(symbolId);
+    if (cached && (cached.bid > 0 || cached.ask > 0)) {
+        console.log(`[CTraderClient] ⚠️ Timeout, but returning cached quote: bid=${cached.bid}, ask=${cached.ask}`);
+        return {
+            bid: cached.bid,
+            ask: cached.ask,
+            timestamp: cached.timestamp,
+            _timeout: true,
+        };
+    }
+
     // ✅ CRITICAL FIX: When market is closed, cTrader doesn't send spot events
     // Instead of throwing error, return zero prices with clear indication
     console.warn(`[CTraderClient] ⚠️ No spot event received - market may be closed or symbol inactive`);
