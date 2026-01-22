@@ -39,7 +39,11 @@ const globalSpotCache = new Map<string, Map<number, { bid: number; ask: number; 
 // const globalSubscribedSymbols = new Map<string, Set<number>>();
 
 function getGlobalCacheKey(isDemo: boolean, accountId: string): string {
-  return `${isDemo ? 'demo' : 'live'}_${accountId}`;
+  // ✅ SHARED QUOTE FEED OPTIMIZATION:
+  // Use a simpler cache key that ignores accountId for market data.
+  // This allows User B to benefit from quotes subscribed by User A.
+  // We assume price feeds are consistent per environment (Demo vs Live).
+  return `${isDemo ? 'demo' : 'live'}_shared_feed`;
 }
 
 export class CTraderClient {

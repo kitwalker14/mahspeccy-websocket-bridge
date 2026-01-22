@@ -17,6 +17,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { connectionPool } from './connection-pool.ts';
 import type { CTraderCredentials } from './ctrader-client.ts';
+import { ErrorMapper } from './error-mapper.ts';
 
 const app = new Hono();
 
@@ -176,14 +177,8 @@ function validateAccountsRequest(body: any): { valid: boolean; error?: string; c
  * Handle errors consistently
  */
 function handleError(error: any, context: string) {
-  console.error(`[${context}] Error:`, error);
-  
-  return {
-    error: error.message || 'Unknown error',
-    code: 'CTRADER_ERROR',
-    context,
-    timestamp: new Date().toISOString(),
-  };
+  const standardError = ErrorMapper.map(error, context);
+  return standardError.response;
 }
 
 // ============================================================================
@@ -621,7 +616,8 @@ app.post('/api/quote', async (c) => {
     console.error(`[Quote] ❌ Error stack:`, error?.stack);
     console.error(`[Quote] ❌ Full error object:`, JSON.stringify(error, null, 2));
     console.error(`[Quote] ❌ ========== ERROR END ==========\n`);
-    return c.json(handleError(error, 'api/quote'), 500);
+    const mapped = ErrorMapper.map(error, 'api/quote');
+    return c.json(mapped.response, mapped.status);
   }
 });
 
@@ -668,7 +664,8 @@ app.post('/api/trade/market', async (c) => {
     });
   } catch (error) {
     console.error('[Trade] Market order error:', error);
-    return c.json(handleError(error, 'api/trade/market'), 500);
+    const mapped = ErrorMapper.map(error, 'api/trade/market');
+    return c.json(mapped.response, mapped.status);
   }
 });
 
