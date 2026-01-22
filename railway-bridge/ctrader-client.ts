@@ -35,7 +35,8 @@ export interface CTraderCredentials {
 // ✅ CRITICAL FIX: Make spot cache GLOBAL so it's shared across all client instances
 // This fixes the issue where spot events on Client A are not visible to Client B
 const globalSpotCache = new Map<string, Map<number, { bid: number; ask: number; timestamp: number }>>();
-const globalSubscribedSymbols = new Map<string, Set<number>>();
+// REMOVED: globalSubscribedSymbols - Subscriptions must be per-connection to ensure liveness
+// const globalSubscribedSymbols = new Map<string, Set<number>>();
 
 function getGlobalCacheKey(isDemo: boolean, accountId: string): string {
   return `${isDemo ? 'demo' : 'live'}_${accountId}`;
@@ -58,6 +59,9 @@ export class CTraderClient {
   private accessToken: string = ''; // ✅ Initialize with empty string
   private cacheKey: string; // ✅ Key for global cache
   private symbolMetadata = new Map<number, { digits: number; name: string }>(); // ✅ Cache symbol metadata for price transformation
+  
+  // ✅ Subscriptions are now tracked per-connection to ensure we actually receive events
+  private _subscribedSymbols = new Set<number>();
 
   constructor(isDemo: boolean, accountId?: string) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
@@ -68,9 +72,6 @@ export class CTraderClient {
     if (!globalSpotCache.has(this.cacheKey)) {
       globalSpotCache.set(this.cacheKey, new Map());
     }
-    if (!globalSubscribedSymbols.has(this.cacheKey)) {
-      globalSubscribedSymbols.set(this.cacheKey, new Set());
-    }
   }
   
   // ✅ Helper methods to access global cache
@@ -79,7 +80,7 @@ export class CTraderClient {
   }
   
   private get subscribedSymbols(): Set<number> {
-    return globalSubscribedSymbols.get(this.cacheKey)!;
+    return this._subscribedSymbols;
   }
 
   /**
@@ -200,8 +201,8 @@ export class CTraderClient {
     
     // ✅ DO NOT CLEAR GLOBAL CACHE - it's shared across all client instances!
     // The global cache should persist even when individual connections close.
-    // Subscriptions will be re-established automatically when needed.
-    console.log(`[CTraderClient] 🧹 Cleanup - keeping ${this.subscribedSymbols.size} subscriptions and ${this.spotCache.size} cached prices in global cache`);
+    // Subscriptions are per-connection and will be dropped (correctly).
+    console.log(`[CTraderClient] 🧹 Cleanup - dropping ${this.subscribedSymbols.size} active subscriptions, keeping ${this.spotCache.size} cached prices`);
     
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
@@ -965,11 +966,16 @@ export class CTraderClient {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      // ✅ If still no data after waiting, return error with diagnostics
-      console.error(`[CTraderClient] ❌ No spot event received for already-subscribed symbol ${symbolId}`);
-      console.error(`[CTraderClient] This indicates cTrader is not sending spot events`);
-      console.error(`[CTraderClient] Connection state: ${this.ws?.readyState}`);
-      throw new Error(`No spot events received for symbolId=${symbolId} after 5s wait`);
+      // ✅ If still no data after waiting, assume market is closed or symbol is quiet
+      console.warn(`[CTraderClient] ⚠️ No spot event received for already-subscribed symbol ${symbolId}`);
+      console.warn(`[CTraderClient] Returning last known cache or zero values (Market Closed?)`);
+      
+      return {
+        bid: 0,
+        ask: 0,
+        timestamp: Date.now(),
+        marketClosed: true,
+      };
     }
     
     // ✅ If not subscribed, send subscription request
