@@ -79,6 +79,7 @@ export class CTraderClient {
     lotSizeCents?: number;
     minVolumeCents?: number;
     stepVolumeCents?: number;
+    maxVolumeCents?: number;
   }>(); // ✅ Cache symbol metadata for price transformation
   
   // ✅ Subscriptions are now tracked per-connection to ensure we actually receive events
@@ -456,15 +457,38 @@ export class CTraderClient {
     // ✅ Cache symbol metadata for decoding
     if (response.symbol) {
       for (const s of response.symbol) {
-        this.symbolMetadata.set(s.symbolId, { 
+        // ✅ CRITICAL FIX: Explicitly coerce symbolId to Number.
+        const sId = Number(s.symbolId);
+        if (!Number.isFinite(sId)) continue;
+        
+        this.symbolMetadata.set(sId, { 
           digits: s.digits, 
           name: s.symbolName,
           // ✅ Cache volume rules for order placement
           lotSizeCents: s.lotSize,
           minVolumeCents: s.minVolume,
-          stepVolumeCents: s.stepVolume
+          stepVolumeCents: s.stepVolume,
+          maxVolumeCents: s.maxVolume
         });
       }
+
+      // --- SANITY LOG: symbolMetadata keys (safe, no secrets) ---
+      try {
+        const keys = Array.from(this.symbolMetadata.keys());
+        const sample = keys.slice(0, 10).map((k) => ({
+          key: k,
+          typeofKey: typeof k,
+        }));
+      
+        console.log('[SymbolCache] getSymbols() populated symbolMetadata', {
+          symbolCount: response.symbol?.length ?? 0,
+          mapSize: this.symbolMetadata.size,
+          sampleKeys: sample,
+        });
+      } catch (e) {
+        console.warn('[SymbolCache] getSymbols() sanity log failed:', e);
+      }
+      // --- END SANITY LOG ---
     }
     
     return response;
@@ -502,13 +526,69 @@ export class CTraderClient {
   /**
    * Helper: Resolve volume from lots/units to normalized cents
    */
-  private resolveVolumeCents(params: any, symbolId: number): number {
-    const symData = this.symbolMetadata.get(symbolId);
-    if (!symData) throw new Error(`SYMBOL_SPEC_MISSING: symbolId=${symbolId}`);
+  private async resolveVolumeCents(params: any, symbolId: number): Promise<number> {
+    const sid = Number(symbolId);
+    
+    // --- SANITY LOG: symbolId lookup type and map keys (safe) ---
+    try {
+      const sidRaw = symbolId as any;
+      const sidNum = Number(sidRaw);
+    
+      const hasRaw = this.symbolMetadata.has(sidRaw);
+      const hasNum = this.symbolMetadata.has(sidNum);
+    
+      console.log('[SymbolCache] resolveVolumeCents() lookup', {
+        symbolIdRaw: sidRaw,
+        typeofSymbolIdRaw: typeof sidRaw,
+        symbolIdNum: sidNum,
+        typeofSymbolIdNum: typeof sidNum,
+        mapSize: this.symbolMetadata.size,
+        hasRawKey: hasRaw,
+        hasNumericKey: hasNum,
+        sampleKeys: Array.from(this.symbolMetadata.keys()).slice(0, 5).map((k) => ({
+          key: k,
+          typeofKey: typeof k,
+        })),
+      });
+    } catch (e) {
+      console.warn('[SymbolCache] resolveVolumeCents() sanity log failed:', e);
+    }
+    // --- END SANITY LOG ---
+
+    let symData = this.symbolMetadata.get(sid);
+
+    // ✅ Lazy Bootstrap: If missing, fetch symbols and retry
+    if (!symData) {
+      console.log(`[resolveVolumeCents] Symbol ${sid} metadata missing, fetching all symbols...`);
+      await this.getSymbols(String(params.accountId));
+      symData = this.symbolMetadata.get(sid);
+      
+      if (!symData) {
+         console.warn(`[resolveVolumeCents] ⚠️ CRITICAL: Symbol ${sid} metadata missing after refresh. Using FALLBACK defaults (Forex Standard). Loaded symbols: ${this.symbolMetadata.size}`);
+         
+         // FALLBACK: Don't crash, assume standard Forex specs
+         // Lot = 100,000 units = 10,000,000 cents
+         // Min = 1,000 units = 100,000 cents (Standard micro lot is 1000 units)
+         // Step = 1,000 units = 100,000 cents
+         symData = {
+            digits: 5,
+            name: `Unknown-${sid}`,
+            lotSizeCents: 10000000,
+            minVolumeCents: 100000, // 1000 units
+            stepVolumeCents: 100000, // 1000 units
+            maxVolumeCents: 100000000000
+         };
+         
+         // Cache this fake metadata to prevent repeated refresh spam
+         this.symbolMetadata.set(sid, symData);
+      }
+    }
 
     const lotSizeCents = Number(symData.lotSizeCents || 10000000); 
     const minVolumeCents = Number(symData.minVolumeCents || 100000); 
     const stepVolumeCents = Number(symData.stepVolumeCents || 1000); 
+    // Default to a large number if max is missing
+    const maxVolumeCents = Number(symData.maxVolumeCents || 100000000000);
 
     // Determine incoming volume intent
     // Back-compat: treat params.volume as lots if no explicit field exists
@@ -528,7 +608,13 @@ export class CTraderClient {
     }
 
     // Normalize to broker constraints
-    return clampToStep(volumeCents, minVolumeCents, stepVolumeCents);
+    // 1. Clamp to min/max
+    const clamped = Math.max(minVolumeCents, Math.min(volumeCents, maxVolumeCents));
+    
+    // 2. Round to step
+    // We must ensure we are >= minVolumeCents after rounding
+    // The clampToStep helper I wrote earlier does: Math.max(round(clamped/step)*step, min)
+    return clampToStep(clamped, minVolumeCents, stepVolumeCents);
   }
 
   /**
@@ -537,14 +623,9 @@ export class CTraderClient {
   async placeSmartOrder(params: any): Promise<any> {
     const symbolId = Number(params.symbolId);
 
-    // 1) Ensure symbol metadata is available
-    if (!this.symbolMetadata.has(symbolId)) {
-      console.log(`[placeSmartOrder] Symbol ${symbolId} metadata missing, fetching all symbols...`);
-      await this.getSymbols(params.accountId);
-    }
-    
-    // 2) Resolve volume (normalized)
-    const finalVolumeCents = this.resolveVolumeCents(params, symbolId);
+    // 1) Resolve volume (normalized)
+    // This now handles lazy bootstrapping of symbol metadata if missing
+    const finalVolumeCents = await this.resolveVolumeCents(params, symbolId);
     
     console.log(`[placeSmartOrder] Order: ${params.orderType} ${params.tradeSide}, Symbol=${symbolId}, FinalCents=${finalVolumeCents}`);
 
@@ -659,7 +740,8 @@ export class CTraderClient {
       throw new Error(`Symbol not found: ${symbolName}`);
     }
     
-    return symbol.symbolId;
+    // ✅ Ensure we return a number
+    return Number(symbol.symbolId);
   }
 
   /**

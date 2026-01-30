@@ -133,6 +133,34 @@ app.get('/api/debug/cache', async (c) => {
  * List all available routes (for introspection)
  */
 app.get('/api/debug/routes', (c) => {
+  
+  app.get('/info', (c) => {
+    // Alias for health/stats used by client
+    const stats = connectionPool.getStats();
+    return c.json({
+        status: 'healthy',
+        version: '2.0.0',
+        connections: stats
+    });
+  });
+
+  app.post('/api/reconnect', async (c) => {
+    try {
+        const body = await c.req.json();
+        const validation = validateRequest(body);
+        if (!validation.valid) return c.json({ error: validation.error }, 400);
+
+        const credentials = validation.credentials!;
+        console.log(`[Reconnect] Forcing reconnection for ${credentials.accountId}`);
+        
+        connectionPool.invalidateConnection(credentials);
+        
+        return c.json({ success: true, message: 'Reconnection initiated' });
+    } catch (error) {
+        return c.json(handleError(error, 'api/reconnect'), 500);
+    }
+  });
+
   return c.json({
     data: {
       service: "mahspeccy-websocket-bridge",
