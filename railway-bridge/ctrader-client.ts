@@ -396,6 +396,14 @@ export class CTraderClient {
   }
 
   /**
+   * Perform full authentication (App + Account)
+   */
+  async fullAuth(credentials: { clientId: string; clientSecret: string; accountId: string; accessToken: string }): Promise<void> {
+    await this.authenticateApp(credentials.clientId, credentials.clientSecret);
+    await this.authenticateAccount(credentials.accountId, credentials.accessToken);
+  }
+
+  /**
    * Get accounts by access token
    */
   async getAccounts(accessToken: string): Promise<any> {
