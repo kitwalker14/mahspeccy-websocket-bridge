@@ -128,6 +128,33 @@ app.get('/api/debug/cache', async (c) => {
   }
 });
 
+/**
+ * GET /api/debug/routes
+ * List all available routes (for introspection)
+ */
+app.get('/api/debug/routes', (c) => {
+  return c.json({
+    data: {
+      service: "mahspeccy-websocket-bridge",
+      buildSha: Deno.env.get('RAILWAY_GIT_COMMIT_SHA') || "unknown",
+      routes: [
+        { method: "GET", path: "/health" },
+        { method: "GET", path: "/stats" },
+        { method: "GET", path: "/api/debug/cache" },
+        { method: "GET", path: "/api/debug/routes" },
+        { method: "POST", path: "/api/account" },
+        { method: "POST", path: "/api/positions" },
+        { method: "POST", path: "/api/symbols" },
+        { method: "POST", path: "/api/symbol-lookup" },
+        { method: "POST", path: "/api/quote" },
+        { method: "POST", path: "/api/trade/market" },
+        { method: "POST", path: "/api/candles" },
+        { method: "POST", path: "/api/historical" }
+      ]
+    }
+  });
+});
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -413,6 +440,56 @@ app.post('/api/symbols', async (c) => {
 });
 
 /**
+ * POST /api/symbol-lookup
+ * Look up a specific symbol ID by name
+ */
+app.post('/api/symbol-lookup', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateAccountsRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+    
+    const { symbolName } = body;
+    if (!symbolName) {
+       return c.json({ error: 'symbolName is required' }, 400);
+    }
+
+    const credentials = validation.credentials!;
+    // Ensure accountId is set for the proto request
+    if (!credentials.accountId || credentials.accountId === '0') {
+        credentials.accountId = body.accountId || '0'; 
+    }
+
+    console.log(`[SymbolLookup] Looking up '${symbolName}'`);
+
+    const symbolId = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getSymbolId(credentials.accountId, symbolName);
+    });
+
+    console.log(`[SymbolLookup] ✅ Found ID: ${symbolId}`);
+
+    return c.json({
+      success: true,
+      data: {
+        symbolId,
+        symbolName,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('[SymbolLookup] Error:', error);
+    // If symbol not found, return 404
+    if (error.message && error.message.includes('not found')) {
+        return c.json({ error: error.message }, 404);
+    }
+    return c.json(handleError(error, 'api/symbol-lookup'), 500);
+  }
+});
+
+/**
  * POST /api/quote
  * Get real-time quote for a symbol
  * Accepts either symbolId (number) or symbol (string, e.g. "EURUSD")
@@ -611,19 +688,32 @@ app.post('/api/candles', async (c) => {
 
     const { symbolId, period, from, to, count } = body;
     
-    if (!symbolId || !period || !from || !to) {
-      return c.json({ error: 'symbolId, period, from, and to are required' }, 400);
+    if (!symbolId || !period) {
+      return c.json({ error: 'symbolId and period are required' }, 400);
+    }
+    
+    // Validate time range: either (from + to) OR (count + to)
+    if ((!from || !to) && (!count || !to)) {
+       return c.json({ error: 'Either (from + to) or (count + to) is required' }, 400);
     }
     
     const credentials = validation.credentials!;
     console.log(`[Candles] Fetching candles for symbolId ${symbolId}, period ${period}`);
 
     const response = await connectionPool.withConnection(credentials, async (client) => {
+      // Calculate 'from' if missing but count provided
+      // Actually, proto message allows omitting fromTimestamp if count is provided?
+      // Looking at ctrader-client.ts, it passes fromTimestamp: from.
+      // If 'from' is undefined, it might be an issue if the type requires it.
+      // In proto-messages.ts: fromTimestamp is number (mandatory).
+      // So we MUST calculate 'from' or use 0 if the protocol supports it, but usually trendbars need a range or count.
+      // If the client supports count, it might ignore fromTimestamp.
+      
       return await client.getTrendbars(
         credentials.accountId,
         parseInt(symbolId),
         parseInt(period),
-        parseInt(from),
+        from ? parseInt(from) : 0, // 0 if not provided
         parseInt(to),
         count ? parseInt(count) : undefined
       );
@@ -655,8 +745,13 @@ app.post('/api/historical', async (c) => {
 
     const { symbolId, period, from, to, count } = body;
     
-    if (!symbolId || !period || !from || !to) {
-      return c.json({ error: 'symbolId, period, from, and to are required' }, 400);
+    if (!symbolId || !period) {
+      return c.json({ error: 'symbolId and period are required' }, 400);
+    }
+    
+    // Validate time range: either (from + to) OR (count + to)
+    if ((!from || !to) && (!count || !to)) {
+       return c.json({ error: 'Either (from + to) or (count + to) is required' }, 400);
     }
     
     const credentials = validation.credentials!;
@@ -667,7 +762,7 @@ app.post('/api/historical', async (c) => {
         credentials.accountId,
         parseInt(symbolId),
         parseInt(period),
-        parseInt(from),
+        from ? parseInt(from) : 0,
         parseInt(to),
         count ? parseInt(count) : undefined
       );
