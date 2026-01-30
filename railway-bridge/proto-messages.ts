@@ -312,3 +312,51 @@ export interface ClosePositionReq {
   positionId: number;
   volume: number;
 }
+
+// ============================================================================
+// TRENDBARS (CANDLES)
+// ============================================================================
+
+export enum ProtoOATrendbarPeriod {
+  M1 = 1,
+  M2 = 2,
+  M3 = 3,
+  M4 = 4,
+  M5 = 5,
+  M10 = 6,
+  M15 = 7,
+  M30 = 8,
+  H1 = 9,
+  H4 = 10,
+  H12 = 11,
+  D1 = 12,
+  W1 = 13,
+  MN1 = 14,
+}
+
+export interface ProtoOAGetTrendbarsReq {
+  ctidTraderAccountId: number;
+  fromTimestamp: number;
+  toTimestamp: number;
+  period: ProtoOATrendbarPeriod;
+  symbolId: number;
+  count?: number;
+}
+
+export interface ProtoOATrendbar {
+  volume: number;
+  period: number; // ProtoOATrendbarPeriod
+  low?: number;
+  deltaOpen?: number;
+  deltaClose?: number;
+  deltaHigh?: number;
+  utcTimestampInMinutes?: number;
+}
+
+export interface ProtoOAGetTrendbarsRes {
+  ctidTraderAccountId: number;
+  period: ProtoOATrendbarPeriod;
+  timestamp: number;
+  symbolId: number;
+  trendbar: ProtoOATrendbar[];
+}

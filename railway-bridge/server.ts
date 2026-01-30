@@ -596,6 +596,94 @@ app.post('/api/trade/market', async (c) => {
   }
 });
 
+/**
+ * POST /api/candles
+ * Get historical candles
+ */
+app.post('/api/candles', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbolId, period, from, to, count } = body;
+    
+    if (!symbolId || !period || !from || !to) {
+      return c.json({ error: 'symbolId, period, from, and to are required' }, 400);
+    }
+    
+    const credentials = validation.credentials!;
+    console.log(`[Candles] Fetching candles for symbolId ${symbolId}, period ${period}`);
+
+    const response = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getTrendbars(
+        credentials.accountId,
+        parseInt(symbolId),
+        parseInt(period),
+        parseInt(from),
+        parseInt(to),
+        count ? parseInt(count) : undefined
+      );
+    });
+
+    console.log(`[Candles] ✅ Success`);
+    return c.json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    console.error('[Candles] Error:', error);
+    return c.json(handleError(error, 'api/candles'), 500);
+  }
+});
+
+/**
+ * POST /api/historical
+ * Alias for /api/candles
+ */
+app.post('/api/historical', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbolId, period, from, to, count } = body;
+    
+    if (!symbolId || !period || !from || !to) {
+      return c.json({ error: 'symbolId, period, from, and to are required' }, 400);
+    }
+    
+    const credentials = validation.credentials!;
+    console.log(`[Historical] Fetching candles for symbolId ${symbolId}, period ${period}`);
+
+    const response = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.getTrendbars(
+        credentials.accountId,
+        parseInt(symbolId),
+        parseInt(period),
+        parseInt(from),
+        parseInt(to),
+        count ? parseInt(count) : undefined
+      );
+    });
+
+    console.log(`[Historical] ✅ Success`);
+    return c.json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    console.error('[Historical] Error:', error);
+    return c.json(handleError(error, 'api/historical'), 500);
+  }
+});
+
 // Start the server
 const port = parseInt(Deno.env.get('PORT') || '8000');
 console.log(`[Server] Starting on port ${port}...`);

@@ -21,6 +21,8 @@ import {
   type ClosePositionReq,
   ProtoOAOrderType,
   ProtoOATradeSide,
+  ProtoOATrendbarPeriod,
+  type ProtoOAGetTrendbarsReq,
 } from './proto-messages.ts';
 import { protoLoader } from './proto-loader.ts';
 
@@ -431,11 +433,20 @@ export class CTraderClient {
   async getSymbols(accountId: string): Promise<any> {
     if (!this.accountAuthenticated) throw new Error('Account not authenticated');
     
-    return await this.sendRequest(
+    const response: any = await this.sendRequest(
       ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ,
       { ctidTraderAccountId: parseInt(accountId) },
       60000 
     );
+    
+    // ✅ Cache symbol metadata for decoding
+    if (response.symbol) {
+      for (const s of response.symbol) {
+        this.symbolMetadata.set(s.symbolId, { digits: s.digits, name: s.symbolName });
+      }
+    }
+    
+    return response;
   }
 
   /**
@@ -479,6 +490,62 @@ export class CTraderClient {
       takeProfit: params.takeProfit,
     };
     return await this.sendRequest(ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ, request);
+  }
+
+  /**
+   * Get trendbars (candles)
+   */
+  async getTrendbars(accountId: string, symbolId: number, period: ProtoOATrendbarPeriod, from: number, to: number, count?: number): Promise<any> {
+    if (!this.accountAuthenticated) throw new Error('Account not authenticated');
+
+    const request: ProtoOAGetTrendbarsReq = {
+      ctidTraderAccountId: parseInt(accountId),
+      symbolId,
+      period,
+      fromTimestamp: from,
+      toTimestamp: to,
+    };
+    if (count) request.count = count;
+
+    const response: any = await this.sendRequest(
+      ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ,
+      request
+    );
+
+    // Decode trendbars
+    const trendbars = response.trendbar || [];
+    const candles: any[] = [];
+    
+    // Try to get digits
+    let digits = 5; 
+    if (this.symbolMetadata.has(symbolId)) {
+      digits = this.symbolMetadata.get(symbolId)!.digits;
+    } 
+    const divisor = Math.pow(10, digits);
+
+    for (const bar of trendbars) {
+      const low = bar.low || 0;
+      const open = low + (bar.deltaOpen || 0);
+      const close = low + (bar.deltaClose || 0);
+      const high = low + (bar.deltaHigh || 0);
+      
+      candles.push({
+        t: (bar.utcTimestampInMinutes || 0) * 60000,
+        o: open / divisor,
+        h: high / divisor,
+        l: low / divisor,
+        c: close / divisor,
+        v: bar.volume
+      });
+    }
+
+    return {
+      symbolId,
+      period,
+      candles,
+      rawTrendbars: trendbars,
+      digits
+    };
   }
 
   /**
