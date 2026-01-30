@@ -148,6 +148,8 @@ app.get('/api/debug/routes', (c) => {
         { method: "POST", path: "/api/symbol-lookup" },
         { method: "POST", path: "/api/quote" },
         { method: "POST", path: "/api/trade/market" },
+        { method: "POST", path: "/api/trade/limit" },
+        { method: "POST", path: "/api/trade/stop" },
         { method: "POST", path: "/api/candles" },
         { method: "POST", path: "/api/historical" }
       ]
@@ -423,6 +425,19 @@ app.post('/api/symbols', async (c) => {
       name: s.symbolName,
       digits: s.digits,
       description: s.description,
+      // Raw values in cents (direct from proto)
+      lotSizeCents: s.lotSize,
+      minVolumeCents: s.minVolume,
+      maxVolumeCents: s.maxVolume,
+      stepVolumeCents: s.stepVolume,
+      // Normalized values in units (cents / 100)
+      lotSizeUnits: s.lotSize ? s.lotSize / 100 : 0,
+      minVolumeUnits: s.minVolume ? s.minVolume / 100 : 0,
+      maxVolumeUnits: s.maxVolume ? s.maxVolume / 100 : 0,
+      stepVolumeUnits: s.stepVolume ? s.stepVolume / 100 : 0,
+      // Helper calculations
+      minLots: (s.minVolume && s.lotSize) ? (s.minVolume / s.lotSize) : 0,
+      stepLots: (s.stepVolume && s.lotSize) ? (s.stepVolume / s.lotSize) : 0
     }));
 
     return c.json({
@@ -662,6 +677,19 @@ app.post('/api/trade/market', async (c) => {
       });
     });
 
+    // ✅ CRITICAL FIX: Check for business logic errors in the successful response
+    // cTrader might return an ExecutionEvent with orderStatus=REJECTED or an OrderErrorEvent
+    // Enums: ORDER_STATUS_REJECTED = 3
+    if (response.errorCode || (response.order && (response.order.orderStatus === 3 || response.order.orderStatus === 'ORDER_STATUS_REJECTED'))) {
+         console.warn(`[Trade] ❌ Order rejected: ${response.errorCode || 'ORDER_REJECTED'} - ${response.description}`);
+         return c.json({
+             success: false,
+             errorCode: response.errorCode || 'ORDER_REJECTED',
+             description: response.description || 'Order was rejected',
+             data: response
+         }, 400);
+    }
+
     console.log(`[Trade] ✅ Success`);
     return c.json({
       success: true,
@@ -670,6 +698,116 @@ app.post('/api/trade/market', async (c) => {
   } catch (error) {
     console.error('[Trade] Error:', error);
     return c.json(handleError(error, 'api/trade/market'), 500);
+  }
+});
+
+/**
+ * POST /api/trade/limit
+ * Place a limit order
+ */
+app.post('/api/trade/limit', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbolId, volume, side, price, stopLoss, takeProfit } = body;
+    
+    if (!symbolId || !volume || !side || !price) {
+      return c.json({ error: 'symbolId, volume, side, and price are required' }, 400);
+    }
+    
+    const credentials = validation.credentials!;
+    console.log(`[Trade] Placing LIMIT order: ${side} ${volume} units of symbolId ${symbolId} @ ${price}`);
+
+    const response = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.placeLimitOrder({
+        accountId: credentials.accountId,
+        symbolId: parseInt(symbolId),
+        volume: parseFloat(volume),
+        tradeSide: side,
+        limitPrice: parseFloat(price),
+        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
+        takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+      });
+    });
+
+    if (response.errorCode || (response.order && (response.order.orderStatus === 3 || response.order.orderStatus === 'ORDER_STATUS_REJECTED'))) {
+         console.warn(`[Trade] ❌ Order rejected: ${response.errorCode || 'ORDER_REJECTED'} - ${response.description}`);
+         return c.json({
+             success: false,
+             errorCode: response.errorCode || 'ORDER_REJECTED',
+             description: response.description || 'Order was rejected',
+             data: response
+         }, 400);
+    }
+
+    console.log(`[Trade] ✅ Success`);
+    return c.json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    console.error('[Trade] Error:', error);
+    return c.json(handleError(error, 'api/trade/limit'), 500);
+  }
+});
+
+/**
+ * POST /api/trade/stop
+ * Place a stop order
+ */
+app.post('/api/trade/stop', async (c) => {
+  try {
+    const body = await c.req.json();
+    const validation = validateRequest(body);
+    
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    const { symbolId, volume, side, price, stopLoss, takeProfit } = body;
+    
+    if (!symbolId || !volume || !side || !price) {
+      return c.json({ error: 'symbolId, volume, side, and price are required' }, 400);
+    }
+    
+    const credentials = validation.credentials!;
+    console.log(`[Trade] Placing STOP order: ${side} ${volume} units of symbolId ${symbolId} @ ${price}`);
+
+    const response = await connectionPool.withConnection(credentials, async (client) => {
+      return await client.placeStopOrder({
+        accountId: credentials.accountId,
+        symbolId: parseInt(symbolId),
+        volume: parseFloat(volume),
+        tradeSide: side,
+        stopPrice: parseFloat(price),
+        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
+        takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+      });
+    });
+
+    if (response.errorCode || (response.order && (response.order.orderStatus === 3 || response.order.orderStatus === 'ORDER_STATUS_REJECTED'))) {
+         console.warn(`[Trade] ❌ Order rejected: ${response.errorCode || 'ORDER_REJECTED'} - ${response.description}`);
+         return c.json({
+             success: false,
+             errorCode: response.errorCode || 'ORDER_REJECTED',
+             description: response.description || 'Order was rejected',
+             data: response
+         }, 400);
+    }
+
+    console.log(`[Trade] ✅ Success`);
+    return c.json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    console.error('[Trade] Error:', error);
+    return c.json(handleError(error, 'api/trade/stop'), 500);
   }
 });
 

@@ -193,6 +193,10 @@ export interface SymbolsListRes {
     quoteAssetId: number;
     symbolCategoryId: number;
     description?: string;
+    lotSize?: number;
+    minVolume?: number;
+    stepVolume?: number;
+    maxVolume?: number;
   }>;
 }
 

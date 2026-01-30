@@ -26,6 +26,14 @@ import {
 } from './proto-messages.ts';
 import { protoLoader } from './proto-loader.ts';
 
+// ✅ Helper for volume normalization
+function clampToStep(value: number, min: number, step: number): number {
+  const clamped = Math.max(value, min);
+  // Round to nearest step
+  const stepped = Math.round(clamped / step) * step;
+  return Math.max(stepped, min);
+}
+
 export interface CTraderCredentials {
   clientId: string;
   clientSecret: string;
@@ -65,7 +73,13 @@ export class CTraderClient {
   private lastActivityTimestamp = 0; // ✅ PHASE 3: Track last message activity for smart heartbeat
   private accessToken: string = ''; // ✅ Initialize with empty string
   private cacheKey: string; // ✅ Key for global cache
-  private symbolMetadata = new Map<number, { digits: number; name: string }>(); // ✅ Cache symbol metadata for price transformation
+  private symbolMetadata = new Map<number, { 
+    digits: number; 
+    name: string;
+    lotSizeCents?: number;
+    minVolumeCents?: number;
+    stepVolumeCents?: number;
+  }>(); // ✅ Cache symbol metadata for price transformation
   
   // ✅ Subscriptions are now tracked per-connection to ensure we actually receive events
   private _subscribedSymbols = new Set<number>();
@@ -442,7 +456,14 @@ export class CTraderClient {
     // ✅ Cache symbol metadata for decoding
     if (response.symbol) {
       for (const s of response.symbol) {
-        this.symbolMetadata.set(s.symbolId, { digits: s.digits, name: s.symbolName });
+        this.symbolMetadata.set(s.symbolId, { 
+          digits: s.digits, 
+          name: s.symbolName,
+          // ✅ Cache volume rules for order placement
+          lotSizeCents: s.lotSize,
+          minVolumeCents: s.minVolume,
+          stepVolumeCents: s.stepVolume
+        });
       }
     }
     
@@ -478,18 +499,97 @@ export class CTraderClient {
     return await this.sendRequest(ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ, request);
   }
   
-  // Re-adding helper methods used by server.ts
-  async placeMarketOrder(params: any): Promise<any> {
-      const request = {
+  /**
+   * Helper: Resolve volume from lots/units to normalized cents
+   */
+  private resolveVolumeCents(params: any, symbolId: number): number {
+    const symData = this.symbolMetadata.get(symbolId);
+    if (!symData) throw new Error(`SYMBOL_SPEC_MISSING: symbolId=${symbolId}`);
+
+    const lotSizeCents = Number(symData.lotSizeCents || 10000000); 
+    const minVolumeCents = Number(symData.minVolumeCents || 100000); 
+    const stepVolumeCents = Number(symData.stepVolumeCents || 1000); 
+
+    // Determine incoming volume intent
+    // Back-compat: treat params.volume as lots if no explicit field exists
+    const volumeLots =
+      params.volumeLots != null ? Number(params.volumeLots)
+      : params.volume != null ? Number(params.volume)
+      : null;
+
+    let volumeCents: number;
+
+    if (params.volumeCents != null) {
+      volumeCents = Math.round(Number(params.volumeCents));
+    } else if (volumeLots != null) {
+      volumeCents = Math.round(volumeLots * lotSizeCents);
+    } else {
+      throw new Error("MISSING_VOLUME: expected volumeLots or volumeCents (or legacy volume)");
+    }
+
+    // Normalize to broker constraints
+    return clampToStep(volumeCents, minVolumeCents, stepVolumeCents);
+  }
+
+  /**
+   * Generic Smart Order Placement (Market, Limit, Stop)
+   */
+  async placeSmartOrder(params: any): Promise<any> {
+    const symbolId = Number(params.symbolId);
+
+    // 1) Ensure symbol metadata is available
+    if (!this.symbolMetadata.has(symbolId)) {
+      console.log(`[placeSmartOrder] Symbol ${symbolId} metadata missing, fetching all symbols...`);
+      await this.getSymbols(params.accountId);
+    }
+    
+    // 2) Resolve volume (normalized)
+    const finalVolumeCents = this.resolveVolumeCents(params, symbolId);
+    
+    console.log(`[placeSmartOrder] Order: ${params.orderType} ${params.tradeSide}, Symbol=${symbolId}, FinalCents=${finalVolumeCents}`);
+
+    const request: NewOrderReq = {
       ctidTraderAccountId: parseInt(params.accountId),
-      symbolId: params.symbolId,
-      orderType: ProtoOAOrderType.MARKET,
+      symbolId: symbolId,
+      orderType: params.orderType,
       tradeSide: params.tradeSide === 'BUY' ? ProtoOATradeSide.BUY : ProtoOATradeSide.SELL,
-      volume: Math.round(params.volume),
+      volume: finalVolumeCents,
       stopLoss: params.stopLoss,
       takeProfit: params.takeProfit,
+      // Conditional fields based on order type
+      limitPrice: params.limitPrice,
+      stopPrice: params.stopPrice,
+      comment: params.comment,
+      label: params.label
     };
+    
     return await this.sendRequest(ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ, request);
+  }
+
+  // Re-adding helper methods used by server.ts
+  async placeMarketOrder(params: any): Promise<any> {
+    return this.placeSmartOrder({
+      ...params,
+      orderType: ProtoOAOrderType.MARKET
+    });
+  }
+
+  async placeLimitOrder(params: any): Promise<any> {
+    if (!params.limitPrice) throw new Error("limitPrice is required for limit orders");
+    return this.placeSmartOrder({
+      ...params,
+      orderType: ProtoOAOrderType.LIMIT,
+      limitPrice: Number(params.limitPrice)
+    });
+  }
+
+  async placeStopOrder(params: any): Promise<any> {
+    if (!params.stopPrice) throw new Error("stopPrice is required for stop orders");
+    return this.placeSmartOrder({
+      ...params,
+      orderType: ProtoOAOrderType.STOP,
+      stopPrice: Number(params.stopPrice)
+    });
   }
 
   /**
