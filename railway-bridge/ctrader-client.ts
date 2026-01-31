@@ -84,6 +84,10 @@ export class CTraderClient {
   
   // ✅ Subscriptions are now tracked per-connection to ensure we actually receive events
   private _subscribedSymbols = new Set<number>();
+  
+  // ✅ Cache for positions/orders (short-lived)
+  private lastReconcileTime = 0;
+  private reconcileCache: any = null;
 
   constructor(isDemo: boolean, accountId?: string) {
     this.host = isDemo ? 'demo.ctraderapi.com' : 'live.ctraderapi.com';
@@ -318,6 +322,24 @@ export class CTraderClient {
         }
         return; // Spot events don't have matching requests
       }
+
+      // ✅ NEW: Handle PROTO_OA_EXECUTION_EVENT for real-time order updates
+      if (payloadType === ProtoOAPayloadType.PROTO_OA_EXECUTION_EVENT) {
+        console.log(JSON.stringify({
+          event: 'execution_event_received',
+          timestamp: new Date().toISOString(),
+          executionType: payload.executionType,
+          orderId: payload.order?.orderId,
+          positionId: payload.position?.positionId,
+          orderStatus: payload.order?.orderStatus
+        }));
+        
+        // Invalidate positions cache to force refresh on next poll
+        this.lastReconcileTime = 0;
+        console.log('[CTraderClient] 🔄 Invalidated positions cache due to execution event');
+        
+        return;
+      }
       
       // Check for error responses
       if (payloadType === ProtoOAPayloadType.PROTO_OA_ERROR_RES) {
@@ -496,15 +518,29 @@ export class CTraderClient {
 
   /**
    * Get positions (via reconcile)
+   * ✅ OPTIMIZED: Uses short-lived cache (2s) to prevent polling spam
    */
   async getPositions(accountId: string): Promise<any> {
     if (!this.accountAuthenticated) throw new Error('Account not authenticated');
     
-    return await this.sendRequest(
+    // Check cache (2000ms TTL)
+    const now = Date.now();
+    if (this.reconcileCache && (now - this.lastReconcileTime < 2000)) {
+      console.log(`[CTraderClient] ⚡ Returning cached positions (${now - this.lastReconcileTime}ms old)`);
+      return this.reconcileCache;
+    }
+    
+    const response = await this.sendRequest(
       ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ,
       { ctidTraderAccountId: parseInt(accountId) },
       45000
     );
+    
+    // Update cache
+    this.reconcileCache = response;
+    this.lastReconcileTime = now;
+    
+    return response;
   }
 
   /**
