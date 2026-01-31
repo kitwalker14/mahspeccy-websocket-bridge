@@ -47,11 +47,12 @@ export class ConnectionPool {
 
   /**
    * Get connection key for pooling
+   * Key format: {env}_{accountId}
+   * Note: We deliberately exclude the access token to prevent key explosion and potential leakage.
+   * If a token changes, the connection will eventually fail auth and be invalidated.
    */
   private getKey(credentials: CTraderCredentials): string {
-    // Include first 8 chars of access token in key to detect token changes
-    const tokenPrefix = credentials.accessToken.substring(0, 8);
-    return `${credentials.isDemo ? 'demo' : 'live'}_${credentials.accountId}_${tokenPrefix}`;
+    return `${credentials.isDemo ? 'demo' : 'live'}_${credentials.accountId}`;
   }
 
   /**

@@ -29,11 +29,37 @@ const startTime = Date.now();
 // ============================================================================
 
 // CORS - Allow Supabase to call this service
+const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(s => s.trim());
+
 app.use('*', cors({
-  origin: '*', // In production, restrict to your Supabase domain
+  origin: (origin) => {
+    // Allow if in allowed list or if ALLOWED_ORIGINS is '*'
+    if (allowedOrigins.includes('*')) return origin;
+    return allowedOrigins.includes(origin || '') ? origin : null;
+  },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Bridge-Token'],
 }));
+
+// Auth Guard
+app.use('*', async (c, next) => {
+  // Allow health checks without auth
+  if (c.req.path === '/health' || c.req.path === '/' || c.req.path === '/stats' || c.req.path === '/info') {
+    await next();
+    return;
+  }
+
+  const token = c.req.header('X-Bridge-Token');
+  const sharedSecret = Deno.env.get('BRIDGE_SHARED_SECRET');
+  
+  // If secret not configured, warn but allow (or deny? Safe default is deny)
+  // But for dev we might be lenient. Let's deny if secret IS configured.
+  if (sharedSecret && (!token || token !== sharedSecret)) {
+    return c.json({ error: 'Unauthorized: Invalid Bridge Token' }, 401);
+  }
+  
+  await next();
+});
 
 // Logging
 app.use('*', logger());
